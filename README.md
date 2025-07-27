@@ -3,6 +3,8 @@
 
 [Open this repo in Codevre (free browser editor – no signup or setup)](https://codevre.com/editor?project=7kR8qQoxNCVu1AwDEoqetvzkVGC3_20250727214652256_cpj4)
 
+[Or start with a minimal ShaderMate template](https://codevre.com/editor?project=7kR8qQoxNCVu1AwDEoqetvzkVGC3_20250727220011312_zlv3)
+
 # ShaderMate : A Robust WebGL(2) Multi-Pass Playground
 
 ShaderMate is a lightweight and powerful JavaScript library designed to simplify WebGL shader development. Whether you're transitioning from platforms like ShaderToy, familiar with WebGL frameworks like TWGL.js, or just starting your journey into the world of shaders, ShaderMate provides a streamlined environment for creating stunning visual effects.
@@ -14,6 +16,14 @@ It handles much of the boilerplate WebGL setup, allowing you to focus on writing
 ## Getting Started
 
 To begin using ShaderMate, you'll typically set up a project with four core files: `index.html`, `sketch.js`, `style.css`, and your primary fragment shader, `frag.glsl`.
+
+### Use via CDN
+
+You can quickly include ShaderMate in any HTML page using the CDN:
+
+```html
+<script src="https://cdn.jsdelivr.net/gh/Tezumie/ShaderMate@main/src/shaderMate.js"></script>
+```
 
 ### 1\. `index.html`
 
@@ -30,7 +40,7 @@ This is your main HTML file. It sets up the basic page structure, includes your 
 </head>
 <body>
     <canvas id="glcanvas"></canvas>
-    <script src="/src/shaderMate.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/Tezumie/ShaderMate@main/src/shaderMate.js"></script>
     <script src="sketch.js"></script>
 </body>
 </html>
