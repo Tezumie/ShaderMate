@@ -568,7 +568,9 @@ const ShaderMate = (() => {
       const inject = autoSetup ? Object.assign({}, defaultInject, options.inject) : { header: false, defines: false, mainWrap: false, builtins: false };
 
       const canvas = options.canvas || document.getElementById('glcanvas');
-      const gl = canvas.getContext('webgl2') || canvas.getContext('webgl');
+      const ctxAttrs = { preserveDrawingBuffer: true, premultipliedAlpha: true, alpha: true };
+      const gl = canvas.getContext('webgl2', ctxAttrs) || canvas.getContext('webgl', ctxAttrs);
+      gl.clearColor(0, 0, 0, 0);
       if (!gl) throw new Error('WebGL not supported');
       const isGL2Ctx = isWebGL2(gl);
       const ext = getExtensions(gl, isGL2Ctx);
@@ -890,3 +892,4 @@ const ShaderMate = (() => {
 
 // expose globally
 const startShaderMate = ShaderMate.startShaderMate;
+
