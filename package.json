@@ -67,7 +67,7 @@
     "dev": "node esbuild.config.mjs --serve",
     "preview": "node scripts/serve.mjs --built",
     "clean": "node -e \"const f=require('node:fs');for(const d of ['dist','_site'])f.rmSync(d,{recursive:true,force:true})\"",
-    "test": "npm run build && node --test test/*.test.js",
+    "test": "npm run build && node --test",
     "prepublishOnly": "npm test"
   },
   "peerDependencies": {
