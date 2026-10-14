@@ -1,0 +1,8 @@
+{
+  "title": "Basic",
+  "tag": "Start here",
+  "description": "One shader on a full-window canvas. About twenty lines of GLSL and no canvas tag.",
+  "code": "createShader \u00b7 pointer.smooth",
+  "order": 4,
+  "featured": true
+}

@@ -1,0 +1,8 @@
+{
+  "title": "Hero banner",
+  "tag": "Website",
+  "description": "A luminous wave field behind real page content, with scroll parallax and a hover-reactive button.",
+  "code": "size: canvas \u00b7 u_scroll \u00b7 tween \u00b7 download",
+  "order": 1,
+  "featured": true
+}

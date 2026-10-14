@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+   <title>Basic · ShaderMate examples</title>
+   <meta name="description" content="One shader on a full-window canvas. About twenty lines of GLSL and no canvas tag.">
+   <!--HEAD-->
+   <style>html, body { height: 100%; overflow: hidden; background: #000 }</style>
+</head>
+<body>
+   <!--BACK-->
+   <div class="hint">move the mouse <kbd>S</kbd> screenshot <kbd>space</kbd> pause</div>
+
+   <!-- No <canvas> needed: a full-window one is created when none is given. -->
+   <script src="../../lib/shadermate.js"></script>
+   <script>
+      // Domain-warped fbm ("warping" by Inigo Quilez). Built-ins like iTime, iResolution and
+      // iMouse are declared automatically; pointer.smooth eases the mouse for a buttery feel.
+      const sm = ShaderMate.createShader({
+         pointer: { smooth: 0.08 },
+         shader: `
+            float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+            float noise(vec2 p) {
+               vec2 i = floor(p), f = fract(p);
+               f = f * f * (3.0 - 2.0 * f);
+               return mix(mix(hash(i), hash(i + vec2(1, 0)), f.x), mix(hash(i + vec2(0, 1)), hash(i + 1.0), f.x), f.y);
+            }
+            float fbm(vec2 p) {
+               float v = 0.0, a = 0.5;
+               mat2 rot = mat2(0.8, 0.6, -0.6, 0.8);
+               for (int i = 0; i < 5; i++) { v += a * noise(p); p = rot * p * 2.0 + 10.0; a *= 0.5; }
+               return v;
+            }
+            void mainImage(out vec4 o, in vec2 fc) {
+               vec2 uv = (fc - 0.5 * iResolution.xy) / iResolution.y;
+               vec2 m  = (iMouse.xy - 0.5 * iResolution.xy) / iResolution.y;
+               float t = iTime * 0.12;
+
+               vec2 q = vec2(fbm(uv + t), fbm(uv + vec2(5.2, 1.3) - t));
+               vec2 r = vec2(fbm(uv + 4.0 * q + vec2(1.7, 9.2) + 0.3 * t),
+                             fbm(uv + 4.0 * q + vec2(8.3, 2.8) + 0.2 * t));
+               float f = fbm(uv + 4.0 * r + m * 0.6);
+
+               vec3 col = mix(vec3(0.02, 0.03, 0.10), vec3(0.10, 0.55, 0.75), clamp(f * f * 2.5, 0.0, 1.0));
+               col = mix(col, vec3(0.95, 0.30, 0.50), clamp(length(q) - 0.4, 0.0, 1.0) * 0.8);
+               col = mix(col, vec3(1.00, 0.85, 0.50), smoothstep(0.55, 0.9, r.y) * 0.7);
+               col = pow(col, vec3(1.6)) * 1.7;                                   // contrast
+               col *= 0.45 + 0.55 * smoothstep(1.3, 0.0, length(uv - m));         // soft light at the cursor
+               o = vec4(col, 1.0);
+            }`,
+      });
+
+      addEventListener('keydown', e => {
+         if (e.key === 's') sm.download('basic.png');
+         if (e.key === ' ') { e.preventDefault(); sm.toggle(); }
+      });
+   </script>
+</body>
+</html>

@@ -1,0 +1,8 @@
+{
+  "title": "Flow field",
+  "tag": "Simulation",
+  "description": "Ink pushed around by curl noise in a ping-pong float buffer. Paint with the mouse.",
+  "code": "pingpong \u00b7 float \u00b7 GUI addon",
+  "order": 3,
+  "featured": true
+}

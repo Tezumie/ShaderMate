@@ -1,0 +1,8 @@
+{
+  "title": "Playground",
+  "tag": "Editor",
+  "description": "Edit GLSL and watch it hot-reload, with presets, an error overlay, screenshots and recording.",
+  "code": "setShader \u00b7 errorOverlay \u00b7 record",
+  "order": 6,
+  "featured": true
+}

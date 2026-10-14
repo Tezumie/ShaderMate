@@ -1,0 +1,8 @@
+{
+  "title": "Shader buttons",
+  "tag": "Interface",
+  "description": "Six real buttons with shader backgrounds: hover tweens, press states and click ripples.",
+  "code": "many instances \u00b7 tween \u00b7 pointer.target",
+  "order": 2,
+  "featured": true
+}

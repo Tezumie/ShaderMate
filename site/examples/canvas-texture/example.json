@@ -1,0 +1,8 @@
+{
+  "title": "Canvas as texture",
+  "tag": "Integration",
+  "description": "A 2D canvas clock redrawn every frame and warped by a shader.",
+  "code": "channels: [canvas] \u00b7 live upload",
+  "order": 5,
+  "featured": true
+}

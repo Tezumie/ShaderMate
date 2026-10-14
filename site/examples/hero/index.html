@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+   <title>Hero banner · ShaderMate examples</title>
+   <meta name="description" content="A luminous wave field behind real page content, with scroll parallax and a hover-reactive button.">
+   <!--HEAD-->
+   <style>
+      .hero { position: relative; height: 86vh; min-height: 460px; overflow: hidden; border-bottom: 1px solid var(--border) }
+      .hero canvas { width: 100%; height: 100%; display: block }   /* ShaderMate follows this box */
+      .hero .copy { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; pointer-events: none; padding: 0 20px }
+      .hero .tag { justify-self: center; height: 22px; padding: 0 9px; display: inline-flex; align-items: center; border-radius: 11px; background: rgba(120, 190, 255, .16); color: var(--w-sky); font-size: 12px; font-weight: 500 }
+      .hero h1 { margin: 14px 0 0; color: #fff; font-size: clamp(44px, 7.5vw, 92px); font-weight: 600; line-height: .98; letter-spacing: -.04em }
+      .hero p { margin: 18px auto 0; max-width: 46ch; color: #d7e6f7; font-size: clamp(15px, 1.8vw, 18px) }
+      .cta { pointer-events: auto; display: inline-flex; gap: 10px; margin-top: 28px; justify-content: center }
+      main { padding: 64px 0 120px }
+      main h2 { margin: 0 0 10px; color: var(--text-strong); font-size: 26px; font-weight: 600; letter-spacing: -.03em }
+      main p { max-width: 70ch; color: var(--text-dim) }
+   </style>
+</head>
+<body>
+   <!--NAV overlay-->
+   <section class="hero">
+      <canvas id="hero"></canvas>
+      <div class="copy">
+         <span class="tag">Hero banner</span>
+         <h1>Shaders,<br>anywhere.</h1>
+         <p>A luminous wave field in one fragment shader: it follows the cursor, swells when you hover the button, and parallaxes as you scroll.</p>
+         <div class="cta">
+            <button class="btn btn-primary" id="shot">Save a screenshot</button>
+            <a class="btn btn-quiet" href="https://github.com/Tezumie/ShaderMate">View source</a>
+         </div>
+      </div>
+   </section>
+
+   <main class="wrap">
+      <h2>How this works</h2>
+      <p>The canvas is an ordinary element styled with CSS (<code>width: 100%; height: 86vh</code>); ShaderMate sizes its bitmap to match and keeps it in sync on resize. The headline and buttons are normal DOM on top of it. The pointer still reaches the shader because ShaderMate listens on the window and maps coordinates into the canvas.</p>
+      <p>Hovering the primary button tweens <code>u_hover</code>, which raises the waves' amplitude and glow. <code>u_scroll</code> shifts the field as you scroll. Rendering pauses when the hero leaves the viewport or the tab is hidden, so the page stays cheap.</p>
+      <p style="height: 50vh"></p>
+   </main>
+   <!--FOOTER-->
+   <!--SCRIPTS-->
+
+   <script type="module">
+      import { createShader, glsl } from '../../lib/shadermate.esm.js';
+
+      const sm = createShader({
+         canvas: '#hero',
+         pointer: { smooth: 0.1 },
+         uniforms: { u_hover: 0 },
+         shader: glsl`
+            uniform float u_hover;
+
+            float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+            float noise(vec2 p) {
+               vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
+               return mix(mix(hash(i), hash(i + vec2(1, 0)), f.x), mix(hash(i + vec2(0, 1)), hash(i + 1.0), f.x), f.y);
+            }
+            float fbm(vec2 p) { float v = 0.0, a = 0.5; for (int i = 0; i < 4; i++) { v += a * noise(p); p = p * 2.1 + 3.7; a *= 0.5; } return v; }
+
+            void mainImage(out vec4 o, in vec2 fc) {
+               vec2 uv = fc / u_resolution;
+               float x = uv.x * u_aspect;
+               vec2 m = u_mouseUV * vec2(u_aspect, 1.0);
+               float t = u_time * 0.35;
+               float scroll = u_scroll.y / u_resolution.y;
+
+               // background: #181818 at the top fading into Codevre navy
+               vec3 col = mix(vec3(0.094), vec3(0.043, 0.153, 0.271), smoothstep(1.0, 0.1, uv.y));
+
+               // wave palette: indigo, deep blue, blue, teal (back to front)
+               vec3 fill[4]; fill[0] = vec3(0.216, 0.188, 0.639); fill[1] = vec3(0.039, 0.298, 0.549); fill[2] = vec3(0.0, 0.471, 0.831); fill[3] = vec3(0.090, 0.635, 0.722);
+               vec3 line = vec3(0.471, 0.745, 1.0);                       // #78beff
+
+               // cursor influence: a ripple that lifts the waves near the mouse
+               float near = exp(-pow(x - m.x, 2.0) * 1.5);
+               float amp = 1.0 + 0.8 * u_hover;
+
+               for (int i = 0; i < 4; i++) {
+                  float fi = float(i);
+                  float base = 0.50 - 0.11 * fi - scroll * (0.15 + 0.05 * fi);
+                  float y = base
+                     + (0.045 + 0.012 * fi) * amp * sin(x * (1.6 + 0.35 * fi) + t * (0.9 + 0.2 * fi) + fi * 1.9)
+                     + 0.035 * amp * (fbm(vec2(x * 1.8 + fi * 3.0, t * 0.6)) - 0.5)
+                     + 0.06 * near * sin(t * 3.0 + fi) * (0.4 + 0.6 * u_hover);
+                  float d = uv.y - y;
+                  // fill below the curve, darker with depth
+                  col = mix(col, fill[i] * (0.45 + 0.1 * fi), smoothstep(0.003, -0.003, d) * 0.92);
+                  // bright line + soft bloom
+                  col += line * exp(-abs(d) * 180.0) * (0.55 + 0.45 * u_hover);
+                  col += fill[i] * exp(-abs(d) * 22.0) * (0.22 + 0.2 * u_hover);
+               }
+
+               // soft light at the cursor + grain
+               col += vec3(0.3, 0.6, 1.0) * 0.08 * exp(-distance(vec2(x, uv.y), m) * 2.5) * (0.5 + u_hover);
+               col += (hash(fc + u_time) - 0.5) * 0.03;
+               o = vec4(col, 1.0);
+            }`,
+      });
+
+      const shot = document.getElementById('shot');
+      shot.addEventListener('pointerenter', () => sm.tween('u_hover', 1, { duration: 500, ease: 'outCubic' }));
+      shot.addEventListener('pointerleave', () => sm.tween('u_hover', 0, { duration: 1100, ease: 'outExpo' }));
+      shot.addEventListener('click', () => sm.download('hero.png'));
+   </script>
+</body>
+</html>

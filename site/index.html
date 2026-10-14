@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<title>ShaderMate: fragment shaders for any canvas</title>
+<meta name="description" content="Drop GLSL on a hero, a button or a whole page. Multipass buffers, tweenable uniforms, capture and recording in one dependency-free library for WebGL 1 and 2.">
+<!--HEAD css=landing-->
+</head>
+<body class="page-landing">
+<a class="skip" href="#content">Skip to content</a>
+<!--ANNOUNCE-->
+<!--NAV overlay-->
+
+<main id="content">
+
+<section class="hero" aria-labelledby="hero-title">
+  <canvas class="hero-canvas" aria-hidden="true"></canvas>
+  <div class="hero-inner">
+    <h1 class="hero-title" id="hero-title">ShaderMate</h1>
+    <p class="hero-sub">Fragment shaders for any canvas on the web.</p>
+    <p class="hero-copy">Drop GLSL on a hero, a button or the whole page. Multipass buffers, uniforms you can tween, and one dependency-free file.</p>
+    <div class="hero-cta">
+      <a class="btn btn-primary btn-lg" href="docs/getting-started/">Read the docs</a>
+      <a class="btn btn-secondary btn-lg" href="examples/">Browse examples</a>
+      <span class="install"><i>$</i> npm i shadermate <button type="button" data-copy="npm i shadermate">Copy</button></span>
+    </div>
+  </div>
+  <div class="tweaks" role="group" aria-label="Live uniforms for the shader behind the heading">
+    <span class="tweaks-note">These sliders set uniforms on the shader behind the title. Move your cursor too.</span>
+    <label class="tweak"><span>u_speed</span><input type="range" name="u_speed" min="0" max="3" step="0.1" value="1"><output>1.0</output></label>
+    <label class="tweak"><span>u_warp</span><input type="range" name="u_warp" min="0" max="3" step="0.1" value="1"><output>1.0</output></label>
+    <label class="tweak"><span>u_hue</span><input type="range" name="u_hue" min="0" max="1" step="0.05" value="0"><output>0.0</output></label>
+  </div>
+</section>
+
+<div class="frame">
+
+<section class="sec" id="editor" aria-labelledby="editor-h">
+  <div class="sec-head">
+    <div>
+      <h2 id="editor-h">Write GLSL. Watch it run.</h2>
+      <p class="sec-lead">This editor is the real library. Change the code and the canvas recompiles as you type.</p>
+    </div>
+    <a class="sec-link" href="examples/livecode/">Open the full playground</a>
+  </div>
+  <div class="ide">
+    <div class="ide-bar" role="tablist" aria-label="Shader presets">
+      <button class="ide-tab" role="tab" aria-selected="true" data-preset="main">main()</button>
+      <button class="ide-tab" role="tab" aria-selected="false" data-preset="pointer">pointer</button>
+      <button class="ide-tab" role="tab" aria-selected="false" data-preset="mainImage">mainImage()</button>
+      <span class="ide-spacer"></span>
+      <span class="ide-stat" id="ide-stat">starting</span>
+    </div>
+    <div class="ide-body">
+      <div class="ide-code">
+        <pre id="code-layer" aria-hidden="true"><code></code></pre>
+        <textarea id="code" spellcheck="false" autocomplete="off" autocapitalize="off" aria-label="Shader source"></textarea>
+      </div>
+      <div class="ide-view"><canvas id="demo" aria-label="Live shader output"></canvas><div class="ide-err" id="ide-err" role="alert" hidden></div></div>
+    </div>
+  </div>
+  <p class="ide-note">Plain WebGL GLSL is the default. ShaderToy-style <code>mainImage(out vec4, in vec2)</code> is accepted too.</p>
+</section>
+
+<section class="sec" id="features" aria-labelledby="features-h">
+  <div class="ledger">
+    <div class="ledger-intro">
+      <h2 id="features-h">What you want to do, and the line that does it.</h2>
+      <p class="sec-lead">One row per thing you will reach for on a real page. The docs go deeper on each.</p>
+      <p style="margin-top:22px"><a class="sec-link" href="docs/recipes/">Browse the recipes</a></p>
+    </div>
+    <div class="rows">
+      <div class="row"><div><h3>Fill a box, or the whole page</h3><p>The shader follows a canvas's CSS size, or a full-window canvas is made for you.</p></div>
+<pre><code data-hl="js">createShader({ canvas: '#hero', shader });
+createShader({ shader, size: 'window' });</code></pre></div>
+      <div class="row"><div><h3>React to the cursor</h3><p>Track the pointer across the page, or only over one element.</p></div>
+<pre><code data-hl="js">pointer: { target: button, smooth: 0.2 }</code></pre></div>
+      <div class="row"><div><h3>Animate any value</h3><p>Tween a uniform with easing. Vectors tween per component.</p></div>
+<pre><code data-hl="js">sm.tween('u_glow', 3, { duration: 600, ease: 'outCubic' });</code></pre></div>
+      <div class="row"><div><h3>Keep the last frame</h3><p>Ping-pong float buffers for trails, feedback and simulations.</p></div>
+<pre><code data-hl="js">{ name: 'trail', pingpong: true, float: true, channels: ['trail'] }</code></pre></div>
+      <div class="row"><div><h3>Use media as a texture</h3><p>A canvas, video, webcam, audio spectrum or image on any channel.</p></div>
+<pre><code data-hl="js">channels: [myCanvas, { video: 'clip.mp4' }, { camera: true }]</code></pre></div>
+      <div class="row"><div><h3>Save a still or a clip</h3><p>Captures render a fresh frame, so no special context flags.</p></div>
+<pre><code data-hl="js">await sm.download('frame.png');
+await sm.record({ duration: 5000, download: 'loop.webm' });</code></pre></div>
+      <div class="row"><div><h3>Stay quiet off-screen</h3><p>Rendering pauses when the tab is hidden or the canvas scrolls away.</p></div>
+<pre><code data-hl="js">pauseWhenHidden: true,   // the default
+maxFps: 30</code></pre></div>
+      <div class="row"><div><h3>Use it from React</h3><p>Props update uniforms live without rebuilding the shader.</p></div>
+<pre><code data-hl="jsx">&lt;ShaderCanvas shader={frag} uniforms={{ u_hover }} /&gt;</code></pre></div>
+      <div class="row"><div><h3>Tweak with sliders</h3><p>Build a control panel from your uniforms in one call.</p></div>
+<pre><code data-hl="js">await createGui(sm);</code></pre></div>
+    </div>
+  </div>
+</section>
+
+<section class="sec" id="examples" aria-labelledby="examples-h">
+  <div class="sec-head">
+    <div>
+      <h2 id="examples-h">Made with ShaderMate.</h2>
+      <p class="sec-lead">Every tile is a live shader. Each one opens as a plain HTML page you can read and copy.</p>
+    </div>
+    <a class="sec-link" href="examples/">All examples</a>
+  </div>
+  <div class="mosaic">
+<!--MOSAIC-->
+  </div>
+</section>
+
+<section class="sec" id="start" aria-labelledby="start-h">
+  <div class="split">
+    <div>
+      <h2 id="start-h">At a glance</h2>
+      <dl class="spec">
+        <div><dt>Size</dt><dd>{{size}} <small>gzipped, core</small></dd></div>
+        <div><dt>Dependencies</dt><dd>None</dd></div>
+        <div><dt>WebGL</dt><dd>1 and 2, picked automatically</dd></div>
+        <div><dt>Shaders</dt><dd>Plain GLSL, or ShaderToy-style <code>mainImage</code> <small>(FragCoord.xyz exports paste in too)</small></dd></div>
+        <div><dt>Builds</dt><dd>Script tag, ES module, CommonJS, TypeScript types</dd></div>
+        <div><dt>Add-ons</dt><dd><code>shadermate/gui</code>, <code>shadermate/react</code></dd></div>
+        <div><dt>License</dt><dd>MIT</dd></div>
+      </dl>
+    </div>
+    <div class="start" data-tabs>
+      <h2 style="font-size:clamp(28px,3.4vw,42px);margin-bottom:26px;max-width:none">Start in a minute.</h2>
+      <div class="tabs" role="tablist" aria-label="Install method">
+        <button role="tab" aria-selected="true">npm</button>
+        <button role="tab" aria-selected="false">Script tag</button>
+        <button role="tab" aria-selected="false">React</button>
+      </div>
+      <div role="tabpanel" class="code-panel">
+<pre><code data-hl="js">// npm i shadermate
+import { createShader } from 'shadermate';
+
+createShader({
+  canvas: '#hero',
+  shader: `void main() {
+    vec2 uv = gl_FragCoord.xy / u_resolution;
+    fragColor = vec4(uv, 0.5 + 0.5 * sin(u_time), 1.0);
+  }`,
+});</code></pre><button class="copy" type="button">Copy</button></div>
+      <div role="tabpanel" class="code-panel" hidden>
+<pre><code data-hl="html">&lt;canvas id="hero"&gt;&lt;/canvas&gt;
+&lt;script src="https://cdn.jsdelivr.net/npm/shadermate@2/dist/shadermate.min.js"&gt;&lt;/script&gt;
+&lt;script&gt;
+  ShaderMate.createShader({ canvas: '#hero', shader: 'hero.glsl' });
+&lt;/script&gt;</code></pre><button class="copy" type="button">Copy</button></div>
+      <div role="tabpanel" class="code-panel" hidden>
+<pre><code data-hl="jsx">// npm i shadermate
+import { ShaderCanvas } from 'shadermate/react';
+
+export function Hero({ hover }) {
+  return (
+    &lt;ShaderCanvas
+      shader={frag}
+      uniforms={{ u_hover: hover ? 1 : 0 }}
+      style={{ width: '100%', height: 320 }}
+    /&gt;
+  );
+}</code></pre><button class="copy" type="button">Copy</button></div>
+      <p class="start-note">Next: <a href="docs/getting-started/">the quick start</a>, <a href="docs/writing-shaders/">writing shaders</a>, <a href="docs/migrating/">migrating from 1.x</a>.</p>
+    </div>
+  </div>
+</section>
+
+<section class="sec closer" aria-labelledby="closer-h">
+  <h2 id="closer-h">Put a shader on your page.</h2>
+  <div class="hero-cta">
+    <a class="btn btn-primary btn-lg" href="docs/getting-started/">Read the quick start</a>
+    <a class="btn btn-secondary btn-lg" href="https://github.com/Tezumie/ShaderMate">Star on GitHub</a>
+  </div>
+</section>
+
+</div>
+</main>
+
+<!--FOOTER-->
+<!--THUMBS-->
+<!--SCRIPTS-->
+<script type="module" src="assets/landing.js"></script>
+<script type="module" src="assets/gallery.js"></script>
+</body>
+</html>

@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+   <title>Playground · ShaderMate examples</title>
+   <meta name="description" content="Edit GLSL and watch it hot-reload, with presets, an error overlay, screenshots and recording.">
+   <!--HEAD-->
+   <style>
+      body { height: 100vh; display: grid; grid-template-rows: 56px 1fr; grid-template-columns: minmax(320px, 46%) 1fr; overflow: hidden }
+      .toolbar { grid-column: 1 / -1 }
+      textarea { width: 100%; height: 100%; padding: 16px; border: 0; border-right: 1px solid var(--border); resize: none; background: var(--surface); color: var(--text-strong); font: 13px/1.55 var(--mono-font); outline: none; tab-size: 4 }
+      canvas { width: 100%; height: 100%; display: block; background: #000 }
+      @media (max-width: 700px) { body { grid-template-columns: 1fr; grid-template-rows: 56px 1fr 1fr } textarea { border-right: 0; border-bottom: 1px solid var(--border) } }
+   </style>
+</head>
+<body>
+   <header class="toolbar">
+      <a class="title" href="../">&larr; Examples</a>
+      <select class="select" id="preset"></select>
+      <button class="btn btn-quiet btn-sm" id="shot">Screenshot</button>
+      <button class="btn btn-quiet btn-sm" id="rec">Record 4s</button>
+      <button class="btn btn-primary btn-sm" id="pause">Pause</button>
+      <span class="meta" id="fps"></span>
+   </header>
+   <textarea id="code" spellcheck="false"></textarea>
+   <canvas id="out"></canvas>
+
+   <script src="../../assets/theme.js"></script>
+   <script type="module">
+      import { createShader } from '../../lib/shadermate.esm.js';
+
+      const presets = {
+         'Tunnel': `void mainImage(out vec4 o, in vec2 fc) {
+    vec2 p = (fc - 0.5 * iResolution.xy) / iResolution.y;
+    float a = atan(p.y, p.x), r = length(p);
+    vec2 uv = vec2(0.3 / r + iTime * 0.6, a / 3.1416 + iTime * 0.1);
+    float f = sin(uv.x * 12.0) * sin(uv.y * 12.0);
+    vec3 col = 0.5 + 0.5 * cos(iTime + uv.xyx * 4.0 + vec3(0, 2, 4));
+    col *= smoothstep(-0.2, 0.6, f) * r * 2.5;
+    o = vec4(col, 1.0);
+}`,
+         'Raymarched sphere': `float sdf(vec3 p) {
+    p.xz *= mat2(cos(iTime), -sin(iTime), sin(iTime), cos(iTime));
+    float box = length(max(abs(p) - 0.7, 0.0)) - 0.1;
+    float sph = length(p) - 1.0;
+    return mix(box, sph, 0.5 + 0.5 * sin(iTime * 0.8));
+}
+vec3 normal(vec3 p) { vec2 e = vec2(0.002, 0); return normalize(vec3(sdf(p+e.xyy)-sdf(p-e.xyy), sdf(p+e.yxy)-sdf(p-e.yxy), sdf(p+e.yyx)-sdf(p-e.yyx))); }
+void mainImage(out vec4 o, in vec2 fc) {
+    vec2 p = (fc - 0.5 * iResolution.xy) / iResolution.y;
+    vec3 ro = vec3(0, 0, -3.5), rd = normalize(vec3(p, 1.6));
+    float t = 0.0; vec3 col = vec3(0.02, 0.02, 0.05) + p.y * 0.05;
+    for (int i = 0; i < 80; i++) {
+        vec3 q = ro + rd * t; float d = sdf(q);
+        if (d < 0.001) { vec3 n = normal(q); vec3 l = normalize(vec3(1, 2, -2));
+            float dif = max(dot(n, l), 0.0); float spec = pow(max(dot(reflect(-l, n), -rd), 0.0), 32.0);
+            col = vec3(0.9, 0.4, 0.3) * dif + spec + 0.1 * n.y + 0.05; break; }
+        if (t > 10.0) break; t += d;
+    }
+    o = vec4(col, 1.0);
+}`,
+         'Plasma': `void mainImage(out vec4 o, in vec2 fc) {
+    vec2 uv = fc / iResolution.xy * 4.0;
+    float t = iTime;
+    float v = sin(uv.x + t) + sin(uv.y + t * 0.7) + sin((uv.x + uv.y) * 0.5 + t) + sin(length(uv - 2.0) * 2.0 - t);
+    vec3 col = 0.5 + 0.5 * cos(v + vec3(0, 2, 4) + iMouse.x / iResolution.x * 3.0);
+    o = vec4(col, 1.0);
+}`,
+         'FragCoord.xyz style': `// Written the way FragCoord.xyz shaders are: own main(), fragColor, vec4 u_mouse.
+uniform vec2 u_resolution;
+uniform vec4 u_mouse;      // xy: position, zw: click position (negative while the button is up)
+uniform float u_scroll;    // mouse-wheel accumulator: exp(u_scroll) = zoom
+
+void main() {
+    vec2 p = (gl_FragCoord.xy - 0.5 * u_resolution) / u_resolution.y * exp(-u_scroll);
+    vec2 m = (u_mouse.xy - 0.5 * u_resolution) / u_resolution.y;
+    float t = u_time;
+    float d = length(p - m * 0.5);
+    float rings = sin(d * 30.0 - t * 4.0) * 0.5 + 0.5;
+    float press = step(0.0, u_mouse.z);
+    vec3 col = (0.5 + 0.5 * cos(t + d * 6.0 + vec3(0, 2, 4))) * rings;
+    col = mix(col, vec3(1.0) - col, press * 0.5);
+    fragColor = vec4(col, 1.0);
+}`,
+         'Voronoi': `vec2 h2(vec2 p) { return fract(sin(vec2(dot(p, vec2(127.1, 311.7)), dot(p, vec2(269.5, 183.3)))) * 43758.5453); }
+void mainImage(out vec4 o, in vec2 fc) {
+    vec2 p = fc / iResolution.y * 6.0;
+    vec2 i = floor(p), f = fract(p);
+    float d1 = 9.0, d2 = 9.0;
+    for (int y = -1; y <= 1; y++) for (int x = -1; x <= 1; x++) {
+        vec2 g = vec2(x, y); vec2 c = g + 0.5 + 0.45 * sin(iTime + 6.28 * h2(i + g));
+        float d = length(c - f); if (d < d1) { d2 = d1; d1 = d; } else if (d < d2) d2 = d;
+    }
+    float edge = smoothstep(0.0, 0.06, d2 - d1);
+    vec3 col = mix(vec3(1.0, 0.9, 0.6), vec3(0.1, 0.2, 0.5) + 0.4 * d1, edge);
+    o = vec4(col, 1.0);
+}`,
+      };
+
+      const code = document.getElementById('code');
+      const sel = document.getElementById('preset');
+      for (const name in presets) sel.append(new Option(name, name));
+      code.value = presets[sel.value];
+
+      // errorOverlay: true draws compile errors over the canvas (default 'auto' = only on localhost)
+      const sm = createShader({ canvas: '#out', shader: code.value, errorOverlay: true, theme: window.SITE_THEME });
+
+      let timer;
+      const reload = () => sm.setShader(code.value).catch(() => { /* shown in the overlay */ });
+      code.addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(reload, 250); });
+      code.addEventListener('keydown', e => {           // Tab inserts spaces instead of leaving the box
+         if (e.key === 'Tab') { e.preventDefault(); const s = code.selectionStart; code.setRangeText('    ', s, code.selectionEnd, 'end'); }
+      });
+      sel.addEventListener('change', () => { code.value = presets[sel.value]; reload(); });
+
+      document.getElementById('shot').onclick = () => sm.download('livecode.png');
+      document.getElementById('rec').onclick = async e => {
+         e.target.disabled = true; e.target.textContent = 'Recording…';
+         try { await sm.record({ duration: 4000, download: 'livecode.webm' }); }
+         finally { e.target.disabled = false; e.target.textContent = 'Record 4s'; }
+      };
+      const pause = document.getElementById('pause');
+      pause.onclick = () => { sm.toggle(); pause.textContent = sm.playing ? 'Pause' : 'Play'; };
+
+      // fps readout, smoothed
+      let acc = 0, n = 0;
+      sm.on('afterFrame', ({ fps }) => { acc += fps; n++; });
+      setInterval(() => { if (n) document.getElementById('fps').textContent = (acc / n).toFixed(0) + ' fps'; acc = n = 0; }, 500);
+   </script>
+</body>
+</html>

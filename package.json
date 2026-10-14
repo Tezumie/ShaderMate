@@ -1,0 +1,91 @@
+{
+  "name": "shadermate",
+  "version": "2.0.0",
+  "description": "Drop a GLSL shader on any canvas. Multi-pass, ShaderToy-compatible, zero dependencies.",
+  "type": "module",
+  "license": "MIT",
+  "author": "Tezumie",
+  "homepage": "https://github.com/Tezumie/ShaderMate#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Tezumie/ShaderMate.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Tezumie/ShaderMate/issues"
+  },
+  "keywords": [
+    "webgl",
+    "webgl2",
+    "glsl",
+    "shader",
+    "shadertoy",
+    "multipass",
+    "creative-coding",
+    "hero",
+    "react"
+  ],
+  "main": "./dist/shadermate.cjs",
+  "module": "./dist/shadermate.esm.js",
+  "types": "./types/index.d.ts",
+  "unpkg": "./dist/shadermate.min.js",
+  "jsdelivr": "./dist/shadermate.min.js",
+  "exports": {
+    ".": {
+      "types": "./types/index.d.ts",
+      "import": "./dist/shadermate.esm.js",
+      "require": "./dist/shadermate.cjs",
+      "default": "./dist/shadermate.esm.js"
+    },
+    "./gui": {
+      "types": "./types/gui.d.ts",
+      "import": "./dist/gui.esm.js",
+      "default": "./dist/gui.esm.js"
+    },
+    "./react": {
+      "types": "./types/react.d.ts",
+      "import": "./dist/react.esm.js",
+      "default": "./dist/react.esm.js"
+    },
+    "./dist/*": "./dist/*",
+    "./package.json": "./package.json"
+  },
+  "sideEffects": [
+    "./dist/shadermate-gui.js",
+    "./dist/shadermate-gui.min.js"
+  ],
+  "files": [
+    "dist",
+    "src",
+    "types",
+    "LICENSE",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "node esbuild.config.mjs",
+    "build:site": "npm run build && node scripts/build-site.mjs",
+    "watch": "node esbuild.config.mjs --watch",
+    "dev": "node esbuild.config.mjs --serve",
+    "preview": "node scripts/serve.mjs --built",
+    "clean": "node -e \"const f=require('node:fs');for(const d of ['dist','_site'])f.rmSync(d,{recursive:true,force:true})\"",
+    "test": "npm run build && node --test test/*.test.js",
+    "prepublishOnly": "npm test"
+  },
+  "peerDependencies": {
+    "lil-gui": ">=0.17",
+    "react": ">=16.8"
+  },
+  "peerDependenciesMeta": {
+    "lil-gui": {
+      "optional": true
+    },
+    "react": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.0",
+    "highlight.js": "^11.12.0",
+    "lil-gui": "^0.20.0",
+    "marked": "^15.0.12"
+  }
+}

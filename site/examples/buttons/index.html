@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+   <title>Shader buttons · ShaderMate examples</title>
+   <meta name="description" content="Six real buttons with shader backgrounds: hover tweens, press states and click ripples.">
+   <!--HEAD-->
+   <style>
+      main { min-height: calc(100vh - 60px); display: grid; place-content: center; gap: 28px; padding: 40px 0 }
+      .head { text-align: center }
+      .head h1 { margin: 0; color: var(--text-strong); font-size: 28px; font-weight: 600; letter-spacing: -.03em }
+      .head p { margin: 8px 0 0; color: var(--text-dim); font-size: 14px }
+      .row { display: grid; grid-template-columns: repeat(3, 240px); gap: 16px }
+      @media (max-width: 820px) { .row { grid-template-columns: repeat(2, 1fr); width: calc(100vw - 48px) } }
+
+      /* A real <button>; the canvas is just its background. */
+      .shader-btn {
+         position: relative; overflow: hidden; isolation: isolate;
+         height: 64px; border: 1px solid var(--border-strong); border-radius: 12px;
+         font: 600 15px var(--ui-font); color: #fff; cursor: pointer;
+         background: var(--surface); box-shadow: 0 10px 30px -14px #000;
+         transition: transform .15s, box-shadow .15s, border-color .15s;
+      }
+      .shader-btn:hover { transform: translateY(-2px); box-shadow: 0 16px 36px -16px #000; border-color: #4a4a4a }
+      .shader-btn:active { transform: translateY(0) scale(.985) }
+      .shader-btn canvas { position: absolute; inset: 0; width: 100%; height: 100%; z-index: -1 }
+      .shader-btn span { text-shadow: 0 1px 2px #000a }
+      .note { text-align: center; color: var(--label); font-size: 12.5px }
+      .note code { color: var(--text-dim) }
+   </style>
+</head>
+<body>
+   <!--NAV-->
+   <main>
+      <div class="head"><h1>Shader buttons</h1><p>Hover, press and click. Each button owns a tiny canvas + shader; the label is normal DOM.</p></div>
+      <div class="row">
+         <button class="shader-btn" data-fx="plasma"><canvas></canvas><span>Plasma</span></button>
+         <button class="shader-btn" data-fx="ripple"><canvas></canvas><span>Ripple</span></button>
+         <button class="shader-btn" data-fx="liquid"><canvas></canvas><span>Liquid</span></button>
+         <button class="shader-btn" data-fx="holo"><canvas></canvas><span>Holographic</span></button>
+         <button class="shader-btn" data-fx="aurora"><canvas></canvas><span>Aurora</span></button>
+         <button class="shader-btn" data-fx="neon"><canvas></canvas><span>Neon edge</span></button>
+      </div>
+      <p class="note">Pointer tracking is scoped to each button (<code>pointer: { target: el }</code>), so a shader only reacts while you're over it.</p>
+   </main>
+   <!--FOOTER-->
+   <!--SCRIPTS-->
+
+   <script type="module">
+      import { createShader, glsl } from '../../lib/shadermate.esm.js';
+
+      // Shared uniforms + helpers, pulled into every button shader via `includes`.
+      // Built-ins (u_time, u_mouseUV, u_aspect …) are declared automatically; these three are ours.
+      const common = glsl`
+         uniform float u_hover;   // 0..1, tweened on pointer enter / leave
+         uniform float u_press;   // 0..1, tweened on pointer down / up
+         uniform vec3  u_click;   // click position (UV) and the time it happened
+         float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+         float noise(vec2 p) {
+            vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
+            return mix(mix(hash(i), hash(i + vec2(1, 0)), f.x), mix(hash(i + vec2(0, 1)), hash(i + 1.0), f.x), f.y);
+         }
+         float fbm(vec2 p) { float v = 0.0, a = 0.5; for (int i = 0; i < 4; i++) { v += a * noise(p); p = p * 2.0 + 3.1; a *= 0.5; } return v; }
+         vec3 pal(float t) { return 0.5 + 0.5 * cos(6.2831 * (t + vec3(0.0, 0.33, 0.67))); }
+         // mouse in button UV, but only while hovered (eases back to the centre otherwise)
+         vec2 mouseUV() { return mix(vec2(0.5), u_mouseUV, u_hover); }
+         // signed distance to a rounded-rect border, in pixels, for edge effects
+         float edgeDist(vec2 fc, float radius) {
+            vec2 h = u_resolution * 0.5; vec2 q = abs(fc - h) - (h - radius);
+            return length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - radius;   // 0 at the edge, negative inside
+         }
+      `;
+
+      const effects = {
+         // Sine plasma that brightens and speeds up on hover.
+         plasma: glsl`
+            #include "common.glsl"
+            void mainImage(out vec4 o, in vec2 fc) {
+               vec2 uv = fc / u_resolution; vec2 p = uv * vec2(u_aspect, 1.0) * 3.0;
+               float t = u_time * (0.6 + u_hover * 1.2);
+               vec2 m = mouseUV() * vec2(u_aspect, 1.0) * 3.0;
+               float v = sin(p.x + t) + sin(p.y + t * 0.7) + sin((p.x + p.y) * 0.7 + t * 1.3) + sin(length(p - m) * 3.0 - t);
+               vec3 col = pal(v * 0.15 + 0.1) * (0.35 + 0.35 * u_hover + 0.3 * u_press);
+               o = vec4(col, 1.0);
+            }`,
+
+         // Dark glass with rings expanding from each click (u_click = x, y in UV, time).
+         ripple: glsl`
+            #include "common.glsl"
+            void mainImage(out vec4 o, in vec2 fc) {
+               vec2 uv = fc / u_resolution; vec2 asp = vec2(u_aspect, 1.0);
+               vec3 base = mix(vec3(0.10, 0.12, 0.30), vec3(0.35, 0.15, 0.55), uv.x + 0.2 * noise(uv * 3.0 + u_time * 0.3));
+               float age = u_time - u_click.z;
+               float d = distance(uv * asp, u_click.xy * asp);
+               float ring = smoothstep(0.03, 0.0, abs(d - age * 1.1)) * exp(-age * 2.5);
+               float ring2 = smoothstep(0.02, 0.0, abs(d - age * 0.7)) * exp(-age * 3.0) * 0.6;
+               float glow = smoothstep(0.6, 0.0, distance(uv * asp, mouseUV() * asp)) * u_hover * 0.35;
+               vec3 col = base * (0.7 + 0.3 * u_hover + 0.2 * u_press) + vec3(0.6, 0.8, 1.0) * (ring + ring2) + vec3(0.5, 0.6, 1.0) * glow;
+               o = vec4(col, 1.0);
+            }`,
+
+         // Metaballs drifting around, pulled toward the cursor while hovered.
+         liquid: glsl`
+            #include "common.glsl"
+            float ball(vec2 p, vec2 c, float r) { return r / dot(p - c, p - c); }
+            void mainImage(out vec4 o, in vec2 fc) {
+               vec2 uv = fc / u_resolution; vec2 p = uv * vec2(u_aspect, 1.0);
+               vec2 m = mouseUV() * vec2(u_aspect, 1.0);
+               float t = u_time;
+               vec2 c1 = vec2(0.8 + 0.5 * sin(t * 0.9), 0.5 + 0.3 * cos(t * 1.3));
+               vec2 c2 = vec2(2.2 + 0.6 * cos(t * 0.7), 0.5 + 0.35 * sin(t * 1.1));
+               vec2 c3 = vec2(1.5 + 0.9 * sin(t * 0.5), 0.5 + 0.3 * sin(t * 1.7));
+               c1 = mix(c1, m, u_hover * 0.5); c2 = mix(c2, m, u_hover * 0.3);
+               float f = ball(p, c1, 0.09) + ball(p, c2, 0.08) + ball(p, c3, 0.06) + ball(p, m, 0.05 * u_hover);
+               float edge = smoothstep(0.9, 1.1, f);
+               float rim = smoothstep(0.9, 1.0, f) - smoothstep(1.0, 1.8, f);
+               vec3 col = mix(vec3(0.06, 0.10, 0.16), mix(vec3(0.0, 0.7, 0.6), vec3(0.2, 0.4, 1.0), uv.x), edge) + rim * vec3(0.9, 1.0, 1.0) * 0.5;
+               col += 0.15 * u_press;
+               o = vec4(col, 1.0);
+            }`,
+
+         // Holographic foil: hue depends on view angle (cursor) + fine grain.
+         holo: glsl`
+            #include "common.glsl"
+            void mainImage(out vec4 o, in vec2 fc) {
+               vec2 uv = fc / u_resolution; vec2 m = mouseUV();
+               float angle = (uv.x - m.x) * 1.5 + (uv.y - m.y) * 0.6;
+               float grain = noise(fc * 0.6) * 0.08;
+               float bands = sin((uv.x * 1.2 + uv.y * 0.4 + angle + u_time * 0.1) * 6.2831) * 0.5 + 0.5;
+               vec3 col = pal(angle * 0.6 + bands * 0.15 + grain);
+               float lit = 0.45 + 0.45 * u_hover + 0.2 * u_press;
+               col = mix(vec3(0.9), col, 0.6) * lit + grain * 0.15;
+               o = vec4(col, 1.0);
+            }`,
+
+         // Aurora curtains: fbm bands drifting sideways, teal / green / violet.
+         aurora: glsl`
+            #include "common.glsl"
+            void mainImage(out vec4 o, in vec2 fc) {
+               vec2 uv = fc / u_resolution; float t = u_time * 0.25;
+               float x = uv.x * u_aspect * 1.2 + (mouseUV().x - 0.5) * 0.6 * u_hover;
+               float a = fbm(vec2(x * 1.5 + t, uv.y * 0.6 + t * 0.3));
+               float b = fbm(vec2(x * 2.5 - t * 0.7, uv.y * 0.4 + 7.0));
+               float curtain = smoothstep(0.2, 0.85, a + b * 0.5 - uv.y * 0.35);
+               vec3 col = vec3(0.02, 0.05, 0.10);
+               col += curtain * mix(vec3(0.05, 0.9, 0.55), vec3(0.45, 0.25, 0.95), b) * (0.7 + 0.5 * u_hover + 0.25 * u_press);
+               col += pow(curtain, 4.0) * vec3(0.6, 1.0, 0.9) * 0.25;
+               o = vec4(col, 1.0);
+            }`,
+
+         // Neon edge: a glowing gradient running around the border, chasing the cursor on hover.
+         neon: glsl`
+            #include "common.glsl"
+            void mainImage(out vec4 o, in vec2 fc) {
+               vec2 uv = fc / u_resolution;
+               float d = edgeDist(fc, 11.0);
+               vec2 c = uv - 0.5; vec2 m = mouseUV() - 0.5;
+               float ang = atan(c.y, c.x * u_aspect) / 6.2831;                   // -0.5..0.5 around the centre
+               float mang = atan(m.y, m.x * u_aspect) / 6.2831;
+               float sweep = fract(ang - u_time * 0.15);                           // rotating highlight
+               float chase = exp(-pow(fract(ang - mang + 0.5) - 0.5, 2.0) * 60.0) * u_hover; // highlight near the cursor
+               vec3 hue = pal(ang + u_time * 0.1);
+               float line = exp(-abs(d + 1.5) * 0.9);                              // thin bright edge
+               float glow = exp(-abs(d + 1.5) * 0.12);                             // soft spill inward
+               float energy = 0.35 + 0.5 * pow(sweep, 3.0) + chase + 0.3 * u_press;
+               vec3 col = vec3(0.07, 0.08, 0.11);
+               col += hue * (line * 1.2 + glow * 0.25) * energy;
+               o = vec4(col, 1.0);
+            }`,
+      };
+
+      /** Wire one <button>: shader background + hover / press / click uniforms. */
+      function shaderButton(btn, frag) {
+         const sm = createShader({
+            canvas: btn.querySelector('canvas'),
+            shader: frag,
+            includes: { 'common.glsl': common },
+            pointer: { target: btn, smooth: 0.2 },        // only this button's pointer events
+            uniforms: { u_hover: 0, u_press: 0, u_click: [0.5, 0.5, -10] },
+         });
+         btn.addEventListener('pointerenter', () => sm.tween('u_hover', 1, { duration: 350, ease: 'outCubic' }));
+         btn.addEventListener('pointerleave', () => sm.tween('u_hover', 0, { duration: 700, ease: 'outExpo' }));
+         btn.addEventListener('pointerdown', () => sm.tween('u_press', 1, { duration: 80 }));
+         btn.addEventListener('pointerup', () => sm.tween('u_press', 0, { duration: 500, ease: 'outElastic' }));
+         btn.addEventListener('pointerleave', () => sm.tween('u_press', 0, { duration: 300 }));
+         btn.addEventListener('click', e => {
+            const [u, v] = sm.domToUV(e.clientX, e.clientY);      // click position in the canvas' UV space
+            sm.set('u_click', [u, v, sm.time]);
+         });
+         return sm;
+      }
+
+      for (const btn of document.querySelectorAll('.shader-btn')) shaderButton(btn, effects[btn.dataset.fx]);
+   </script>
+</body>
+</html>
