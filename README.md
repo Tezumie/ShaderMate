@@ -1,5 +1,8 @@
 # ShaderMate
 
+[![GitHub Sponsors](https://img.shields.io/badge/Sponsor-♥-EA4AAA?logo=githubsponsors&logoColor=white)](https://github.com/sponsors/Tezumie)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
 Drop a GLSL shader on any canvas. ShaderToy and FragCoord.xyz compatible, multi-pass, zero dependencies. Works in plain HTML, ES modules, React, and next to other canvas libraries.
 
 **[Docs](https://tezumie.github.io/ShaderMate/docs/)** · **[Examples](https://tezumie.github.io/ShaderMate/examples/)** · [npm](https://www.npmjs.com/package/shadermate)
@@ -25,7 +28,7 @@ npm i shadermate
 
 ```js
 import { createShader } from 'shadermate';
-import { createGui } from 'shadermate/gui';                   // optional tweak panel (needs `npm i lil-gui`)
+import { createGui } from 'shadermate/gui';                 // optional tweak panel (needs `npm i lil-gui`)
 import { ShaderCanvas, useShader } from 'shadermate/react';   // optional React bindings
 ```
 
