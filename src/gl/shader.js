@@ -18,17 +18,9 @@ export function parseShaderLog(log, src) {
    return errors;
 }
 
-/**
- * Compile one shader. Returns { shader } or { error: ShaderMateError }.
- */
-export function compileShader(gl, type, src, { label = '', showExpandedOnError = true } = {}) {
-   const sh = gl.createShader(type);
-   gl.shaderSource(sh, src);
-   gl.compileShader(sh);
-   if (gl.getShaderParameter(sh, gl.COMPILE_STATUS)) return { shader: sh };
-
+/** Build the ShaderMateError (and console report) for a shader whose compile failed. */
+function shaderError(gl, sh, type, src, { label = '', showExpandedOnError = true } = {}) {
    const log = gl.getShaderInfoLog(sh) || '';
-   gl.deleteShader(sh);
    const errors = parseShaderLog(log, src);
    const stage = type === gl.VERTEX_SHADER ? 'Vertex' : 'Fragment';
    const summary = errors.length
@@ -45,7 +37,27 @@ export function compileShader(gl, type, src, { label = '', showExpandedOnError =
    } else {
       console.error('[ShaderMate] ' + err.message);
    }
-   return { error: err };
+   return err;
+}
+
+function linkError(gl, p, opts) {
+   const log = gl.getProgramInfoLog(p) || '';
+   const err = new ShaderMateError(`Program link error${opts && opts.label ? ` in pass "${opts.label}"` : ''}: ${log}`, { pass: opts && opts.label, log });
+   console.error('[ShaderMate] ' + err.message);
+   return err;
+}
+
+/**
+ * Compile one shader. Returns { shader } or { error: ShaderMateError }.
+ */
+export function compileShader(gl, type, src, opts = {}) {
+   const sh = gl.createShader(type);
+   gl.shaderSource(sh, src);
+   gl.compileShader(sh);
+   if (gl.getShaderParameter(sh, gl.COMPILE_STATUS)) return { shader: sh };
+   const error = shaderError(gl, sh, type, src, opts);
+   gl.deleteShader(sh);
+   return { error };
 }
 
 /** Link a program. Returns { program } or { error }. */
@@ -63,12 +75,49 @@ export function createProgram(gl, vsrc, fsrc, opts) {
    gl.deleteShader(f.shader);
 
    if (!gl.getProgramParameter(p, gl.LINK_STATUS)) {
-      const log = gl.getProgramInfoLog(p) || '';
+      const error = linkError(gl, p, opts);
       gl.deleteProgram(p);
-      const err = new ShaderMateError(`Program link error${opts && opts.label ? ` in pass "${opts.label}"` : ''}: ${log}`, { pass: opts && opts.label, log });
-      console.error('[ShaderMate] ' + err.message);
-      return { error: err };
+      return { error };
    }
+   return { program: p };
+}
+
+const wait = () => new Promise(r => {
+   if (typeof requestAnimationFrame === 'function' && !(typeof document !== 'undefined' && document.hidden)) requestAnimationFrame(() => r());
+   else setTimeout(r, 16);
+});
+
+/**
+ * Link a program without blocking the page. Resolves to { program } or { error }.
+ *
+ * Asking the driver for COMPILE_STATUS / LINK_STATUS right after compiling makes the browser wait for the
+ * compile to finish, which can freeze the page for hundreds of milliseconds per shader (Windows translates every
+ * shader for Direct3D). With KHR_parallel_shader_compile the driver compiles in the background and we poll
+ * COMPLETION_STATUS_KHR once per frame. Without the extension we still yield a frame first, so several
+ * programs compile across frames instead of all in one long task.
+ */
+export async function createProgramAsync(gl, vsrc, fsrc, opts = {}) {
+   const ext = gl.getExtension('KHR_parallel_shader_compile');
+   const v = gl.createShader(gl.VERTEX_SHADER), f = gl.createShader(gl.FRAGMENT_SHADER);
+   gl.shaderSource(v, vsrc); gl.compileShader(v);
+   gl.shaderSource(f, fsrc); gl.compileShader(f);
+   const p = gl.createProgram();
+   gl.attachShader(p, v);
+   gl.attachShader(p, f);
+   gl.linkProgram(p);
+
+   if (ext) { while (!gl.isContextLost() && !gl.getProgramParameter(p, ext.COMPLETION_STATUS_KHR)) await wait(); }
+   else await wait();
+
+   let error = null;
+   if (!gl.getProgramParameter(p, gl.LINK_STATUS)) {
+      if (!gl.getShaderParameter(v, gl.COMPILE_STATUS)) error = shaderError(gl, v, gl.VERTEX_SHADER, vsrc, opts);
+      else if (!gl.getShaderParameter(f, gl.COMPILE_STATUS)) error = shaderError(gl, f, gl.FRAGMENT_SHADER, fsrc, opts);
+      else error = linkError(gl, p, opts);
+   }
+   gl.deleteShader(v);
+   gl.deleteShader(f);
+   if (error) { gl.deleteProgram(p); return { error }; }
    return { program: p };
 }
 

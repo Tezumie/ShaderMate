@@ -114,3 +114,41 @@ if (reduced) sm.render();
 const sm = createShader({ canvas, shader, loop: 4 });
 await sm.record({ fps: 60, duration: 4000, download: 'loop.webm' });
 ```
+
+## Many scenes on one canvas
+
+Browsers allow about 16 live WebGL contexts per page. To show many shaders, give them one canvas and play one at a time. A paused instance never draws over the one that is playing, and its buffers still follow resizes. The home page works this way.
+
+```js
+const stage = document.querySelector('#stage');
+const scenes = {
+  intro: createShader({ canvas: stage, shader: introFrag, autoplay: false }),
+  sim:   createShader({ canvas: stage, passes: simPasses, autoplay: false }),
+};
+let active = scenes.intro.play();
+
+function show(name) {
+  active.pause();
+  active = scenes[name].play();
+}
+```
+
+## Many thumbnails, one context
+
+For a grid of previews, render each shader on one hidden canvas with `step()`, then copy the frame into a plain 2D canvas per card. The gallery page uses this.
+
+```js
+const shared = document.createElement('canvas');
+const thumbs = [...document.querySelectorAll('canvas[data-shader]')].map(card => ({
+  ctx: card.getContext('2d'),
+  sm: createShader({ canvas: shared, shader: card.dataset.shader, size: [480, 300], autoplay: false, preserveDrawingBuffer: true }),
+}));
+
+(function loop() {
+  requestAnimationFrame(loop);
+  for (const t of thumbs) {
+    t.sm.step();                                            // render one frame into the shared canvas
+    t.ctx.drawImage(shared, 0, 0, t.ctx.canvas.width, t.ctx.canvas.height);
+  }
+})();
+```

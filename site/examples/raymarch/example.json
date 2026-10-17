@@ -1,0 +1,8 @@
+{
+  "title": "Raymarched blob",
+  "tag": "3D",
+  "description": "Real 3D in one fragment shader: a wobbling SDF blob with a ring, fresnel, reflections and glow. Drag to spin.",
+  "code": "SDF · iMouse · no engine",
+  "order": 7,
+  "featured": true
+}

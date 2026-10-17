@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+   <title>Reaction diffusion · ShaderMate examples</title>
+   <meta name="description" content="Gray-Scott chemistry on the GPU: four chained float passes give 240 simulation steps a second. Drag to seed new growth.">
+   <!--HEAD-->
+   <style>html, body { height: 100%; overflow: hidden; background: #05050a }</style>
+</head>
+<body>
+   <!--BACK-->
+   <div class="hint"><b>click and drag</b> to seed · <kbd>R</kbd> reset · <kbd>S</kbd> screenshot</div>
+
+   <script src="../../lib/shadermate.js"></script>
+   <script>
+      // Gray-Scott reaction diffusion. Each pass is one simulation step, and they read each other in a loop:
+      //   A ← D, B ← A, C ← B, D ← C
+      // so a single frame runs four steps without ping-pong. A pass reading a LATER pass (A reading D) gets that
+      // pass's output from the previous frame. The last pass is drawn with a little lighting.
+      const step = `
+         uniform float u_reset;   // set to 1 for a frame to reseed
+
+         vec2 at(vec2 fc) { return texture(iChannel0, fc / iResolution.xy).rg; }
+         float hash(vec2 p) { p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
+
+         void mainImage(out vec4 o, in vec2 fc) {
+            if (iFrame < 3 || u_reset > 0.5) { o = vec4(1.0, step(0.93, hash(floor(fc / 5.0))), 0.0, 1.0); return; }
+
+            vec2 c = at(fc);
+            vec2 lap = 0.2 * (at(fc + vec2(1, 0)) + at(fc - vec2(1, 0)) + at(fc + vec2(0, 1)) + at(fc - vec2(0, 1)))
+                     + 0.05 * (at(fc + vec2(1)) + at(fc - vec2(1)) + at(fc + vec2(1, -1)) + at(fc - vec2(1, -1))) - c;
+
+            vec2 uv = fc / iResolution.xy;
+            float t = (uv.x + uv.y) * 0.5;                                  // feed/kill drift across the screen
+            float feed = mix(0.0367, 0.055, t), kill = mix(0.0649, 0.062, t);
+            float react = c.x * c.y * c.y;
+            vec2 next = c + vec2(lap.x - react + feed * (1.0 - c.x), 0.5 * lap.y + react - (kill + feed) * c.y);
+
+            vec2 brush = (vec2(sin(iTime * 0.7), sin(iTime * 1.1)) * 0.35 + 0.5) * iResolution.xy;
+            float paint = 1.0 - smoothstep(0.0, 6.0, length(fc - brush));
+            if (iMouse.z > 0.0) paint = max(paint, 1.0 - smoothstep(0.0, 10.0, length(fc - iMouse.xy)));  // iMouse is in this pass's pixels
+            next.y = max(next.y, paint);
+            o = vec4(clamp(next, 0.0, 1.0), 0.0, 1.0);
+         }`;
+
+      const view = `
+         vec3 neon(float t) { return 0.5 + 0.5 * cos(6.28318 * (t + vec3(0.0, 0.33, 0.67))); }
+         void mainImage(out vec4 o, in vec2 fc) {
+            vec2 uv = fc / iResolution.xy, e = 2.0 / iResolution.xy;
+            float b = texture(iChannel0, uv).g;
+            float dx = texture(iChannel0, uv + vec2(e.x, 0)).g - texture(iChannel0, uv - vec2(e.x, 0)).g;
+            float dy = texture(iChannel0, uv + vec2(0, e.y)).g - texture(iChannel0, uv - vec2(0, e.y)).g;
+            vec3 n = normalize(vec3(-dx, -dy, 0.15)), L = normalize(vec3(-0.5, 0.6, 0.6));
+            float v = smoothstep(0.12, 0.32, b);
+            vec3 col = mix(vec3(0.015, 0.01, 0.04), neon(0.55 + 0.4 * uv.x - 0.2 * uv.y + iTime * 0.03), v) * (0.45 + 0.75 * max(dot(n, L), 0.0));
+            col += pow(max(dot(reflect(-L, n), vec3(0, 0, 1)), 0.0), 30.0) * 0.6 * v;
+            o = vec4(col, 1.0);
+         }`;
+
+      const steps = ['A', 'B', 'C', 'D'];
+      const sm = ShaderMate.createShader({
+         uniforms: { u_reset: 0 },
+         passes: [
+            ...steps.map((name, i) => ({ name, shader: step, size: 'half', float: true, wrap: 'repeat', channels: [steps.at(i - 1)] })),
+            { name: 'view', shader: view, channels: ['D'] },
+         ],
+      });
+
+      addEventListener('keydown', e => {
+         if (e.key === 's') sm.download('reaction-diffusion.png');
+         if (e.key === 'r') { sm.set('u_reset', 1); requestAnimationFrame(() => requestAnimationFrame(() => sm.set('u_reset', 0))); }
+      });
+   </script>
+</body>
+</html>

@@ -15,11 +15,8 @@ export const NPM = 'https://www.npmjs.com/package/shadermate';
 
 export const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
-const MARK = `<svg class="mark" viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><g>
-<rect x="0" y="0" width="6" height="6" rx="1.6" fill="#7c5cff"/><rect x="9" y="0" width="6" height="6" rx="1.6" fill="#6f80ff"/><rect x="18" y="0" width="6" height="6" rx="1.6" fill="#5aa6ff" opacity=".7"/>
-<rect x="0" y="9" width="6" height="6" rx="1.6" fill="#6f80ff"/><rect x="9" y="9" width="6" height="6" rx="1.6" fill="#4dbfff"/><rect x="18" y="9" width="6" height="6" rx="1.6" fill="#2ee6d6"/>
-<rect x="0" y="18" width="6" height="6" rx="1.6" fill="#5aa6ff" opacity=".7"/><rect x="9" y="18" width="6" height="6" rx="1.6" fill="#2ee6d6"/><rect x="18" y="18" width="6" height="6" rx="1.6" fill="#ffd166"/>
-</g></svg>`;
+// The brand mark: a rounded square filled with a slowly hue-shifting conic gradient (styled in site.css).
+const MARK = `<span class="mark" aria-hidden="true"></span>`;
 export const markSvg = MARK;
 
 const ICON_SEARCH = `<svg viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><circle cx="9" cy="9" r="5.5"/><path d="m13.5 13.5 3.5 3.5"/></svg>`;
@@ -30,6 +27,7 @@ export const NAV_LINKS = (root) => [
    ['Docs', root + 'docs/'],
    ['Examples', root + 'examples/'],
    ['Playground', root + 'examples/livecode/'],
+   ['Recipes', root + 'docs/recipes/'],
    ['Changelog', root + 'docs/changelog/'],
 ];
 
@@ -42,9 +40,9 @@ export function headTags({ root, title, description, path = '', css = [], noinde
    return `<meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="dark">
-<meta name="theme-color" content="#07080c">
+<meta name="theme-color" content="#05050a">
 <link rel="icon" href="${root}assets/favicon.svg" type="image/svg+xml">
-<link rel="preload" href="${root}assets/fonts/geist.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="${root}assets/fonts/space-grotesk.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="canonical" href="${url}">
 ${noindex ? '<meta name="robots" content="noindex">\n' : ''}<meta property="og:type" content="website">
 <meta property="og:site_name" content="ShaderMate">
@@ -57,19 +55,20 @@ ${noindex ? '<meta name="robots" content="noindex">\n' : ''}<meta property="og:t
 }
 
 export function announceHtml(root) {
-   return `<a class="announce" href="${root}docs/changelog/"><span class="announce-dot" aria-hidden="true"></span><span><strong>ShaderMate ${pkg.version.replace(/\.\d+$/, '')} is out.</strong> A rebuilt core, multipass buffers and a tweak panel. Read the release notes.</span></a>`;
+   return `<a class="announce" href="${root}docs/changelog/"><span class="announce-dot" aria-hidden="true"></span><span><strong>v${pkg.version} is out</strong> · free &amp; MIT open source. Read the release notes →</span></a>`;
 }
 
 export function navHtml(root, { current = '', overlay = false } = {}) {
    const links = NAV_LINKS(root);
    return `<header class="nav${overlay ? ' nav-overlay' : ''}" data-nav>
 <div class="nav-inner">
-<a class="brand" href="${root}" aria-label="ShaderMate home">${MARK}<span>ShaderMate</span></a>
+<a class="brand" href="${root}" aria-label="ShaderMate home">${MARK}<span>ShaderMate</span><span class="brand-ver">${pkg.version.replace(/\.\d+$/, '')}</span></a>
 <nav class="nav-links" aria-label="Primary">${links.map(([l, h]) => `<a href="${h}"${l === current ? ' aria-current="page"' : ''}>${l}</a>`).join('')}</nav>
 <div class="nav-right">
-<button class="search-btn" type="button" data-search aria-label="Search the docs">${ICON_SEARCH}<span class="search-label">Search</span><kbd data-kbd>Ctrl K</kbd></button>
-<a class="icon-btn" href="${REPO}" aria-label="ShaderMate on GitHub">${ICON_GITHUB}</a>
-<a class="ver" href="${root}docs/changelog/">v${pkg.version}</a>
+<button class="search-btn" type="button" data-search aria-label="Search the docs">${ICON_SEARCH}<span class="search-label">Search docs</span><kbd data-kbd>Ctrl K</kbd></button>
+<a class="ver" href="${root}docs/changelog/" title="Release notes">v${pkg.version}</a>
+<a class="npm-btn" href="${NPM}" aria-label="ShaderMate on npm"><i aria-hidden="true"></i>npm</a>
+<a class="nav-gh" href="${REPO}" aria-label="Star ShaderMate on GitHub">${ICON_GITHUB}<span>Star</span></a>
 <button class="icon-btn menu-btn" type="button" data-menu aria-label="Menu" aria-expanded="false" aria-controls="mobile-menu">${ICON_MENU}</button>
 </div>
 </div>
@@ -83,10 +82,14 @@ ${links.map(([l, h]) => `<a href="${h}">${l}</a>`).join('')}
 export function footerHtml(root) {
    const col = (title, items) => `<div class="footer-col"><h2>${title}</h2><ul>${items.map(([l, h]) => `<li><a href="${h}">${l}</a></li>`).join('')}</ul></div>`;
    return `<footer class="footer">
+<div class="footer-cta">
+<h2>Ship pixels,<br><span class="grad">not boilerplate.</span></h2>
+<div class="row"><a class="btn btn-primary btn-lg" href="${root}docs/getting-started/">Get started</a><a class="btn btn-lg" href="${REPO}">★ Star on GitHub</a></div>
+</div>
 <div class="footer-inner">
 <div class="footer-brand">
 <a class="brand" href="${root}">${MARK}<span>ShaderMate</span></a>
-<p>Fragment shaders for any canvas on the web.</p>
+<p>GPU magic in a few lines of JavaScript. Fragment shaders for any canvas on the web.</p>
 <p class="footer-note">Every shader on this site is rendered by ShaderMate.</p>
 </div>
 ${col('Learn', [['Quick start', root + 'docs/getting-started/'], ['Writing shaders', root + 'docs/writing-shaders/'], ['Uniforms', root + 'docs/uniforms/'], ['Multipass', root + 'docs/multipass/'], ['Recipes', root + 'docs/recipes/']])}
@@ -94,7 +97,7 @@ ${col('Reference', [['Options', root + 'docs/options/'], ['Instance API', root +
 ${col('Explore', [['Examples', root + 'examples/'], ['Playground', root + 'examples/livecode/'], ['Changelog', root + 'docs/changelog/'], ['Migrating from 1.x', root + 'docs/migrating/']])}
 ${col('Project', [['GitHub', REPO], ['npm', NPM], ['Issues', REPO + '/issues'], ['Releases', REPO + '/releases'], ['Contributing', root + 'docs/contributing/']])}
 </div>
-<div class="footer-bottom"><span>&copy; ${new Date().getFullYear()} Tezumie. MIT.</span><span>Made with <a href="https://codevre.com">Codevre</a>.</span></div>
+<div class="footer-bottom"><span>&copy; ${new Date().getFullYear()} Tezumie · MIT licensed · v${pkg.version}</span><span>Made with <a href="https://codevre.com">Codevre</a>.</span></div>
 </footer>`;
 }
 

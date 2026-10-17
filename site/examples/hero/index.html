@@ -5,16 +5,22 @@
    <meta name="description" content="A luminous wave field behind real page content, with scroll parallax and a hover-reactive button.">
    <!--HEAD-->
    <style>
-      .hero { position: relative; height: 86vh; min-height: 460px; overflow: hidden; border-bottom: 1px solid var(--border) }
+      .hero { position: relative; height: 92vh; min-height: 520px; overflow: hidden; border-bottom: 1px solid var(--line) }
       .hero canvas { width: 100%; height: 100%; display: block }   /* ShaderMate follows this box */
-      .hero .copy { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; pointer-events: none; padding: 0 20px }
-      .hero .tag { justify-self: center; height: 22px; padding: 0 9px; display: inline-flex; align-items: center; border-radius: 11px; background: rgba(120, 190, 255, .16); color: var(--w-sky); font-size: 12px; font-weight: 500 }
-      .hero h1 { margin: 14px 0 0; color: #fff; font-size: clamp(44px, 7.5vw, 92px); font-weight: 600; line-height: .98; letter-spacing: -.04em }
-      .hero p { margin: 18px auto 0; max-width: 46ch; color: #d7e6f7; font-size: clamp(15px, 1.8vw, 18px) }
-      .cta { pointer-events: auto; display: inline-flex; gap: 10px; margin-top: 28px; justify-content: center }
-      main { padding: 64px 0 120px }
-      main h2 { margin: 0 0 10px; color: var(--text-strong); font-size: 26px; font-weight: 600; letter-spacing: -.03em }
-      main p { max-width: 70ch; color: var(--text-dim) }
+      .hero .copy { position: absolute; inset: 0; display: grid; place-content: center; justify-items: center; text-align: center; pointer-events: none; padding: var(--nav-h) 20px 0 }
+      .hero .badge { display: inline-flex; align-items: center; gap: 8px; padding: 8px 13px; border: 1px solid var(--line-2); border-radius: 99px; background: var(--glass); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); color: var(--strong); font: 500 12px/1 var(--font-mono) }
+      .hero .badge i { width: 7px; height: 7px; border-radius: 99px; background: var(--lime); box-shadow: 0 0 12px var(--lime) }
+      .hero h1 { margin: 22px 0 0; color: var(--strong); font: 700 clamp(52px, 9vw, 128px)/.88 var(--font-display); letter-spacing: -.055em; text-shadow: 0 10px 50px rgba(5, 5, 10, .4) }
+      .hero p { margin: 20px auto 0; max-width: 46ch; color: #e3ecff; font-size: clamp(15px, 1.8vw, 19px); text-shadow: 0 2px 20px rgba(5, 5, 10, .6) }
+      .cta { pointer-events: auto; display: inline-flex; flex-wrap: wrap; gap: 10px; margin-top: 30px; justify-content: center }
+      .notes { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; width: min(1120px, 100% - 40px); margin: 0 auto; padding: 72px 0 120px }
+      .notes .head { grid-column: 1 / -1; margin-bottom: 8px }
+      .notes .head h2 { margin-top: 14px; color: var(--strong); font: 700 clamp(34px, 4.6vw, 60px)/.95 var(--font-display); letter-spacing: -.045em }
+      .note { padding: 22px; border: 1px solid var(--line); border-radius: 20px; background: var(--glass) }
+      .note h3 { color: var(--strong); font: 600 18px/1.2 var(--font-display); letter-spacing: -.02em }
+      .note p { margin-top: 8px; color: var(--dim); font-size: 15px; line-height: 1.55 }
+      .note code { color: var(--text); font: 13px var(--font-mono) }
+      @media (max-width: 860px) { .notes { grid-template-columns: minmax(0, 1fr) } }
    </style>
 </head>
 <body>
@@ -22,21 +28,21 @@
    <section class="hero">
       <canvas id="hero"></canvas>
       <div class="copy">
-         <span class="tag">Hero banner</span>
-         <h1>Shaders,<br>anywhere.</h1>
+         <span class="badge"><i></i>Hero banner</span>
+         <h1>Shaders,<br><span class="grad">anywhere.</span></h1>
          <p>A luminous wave field in one fragment shader: it follows the cursor, swells when you hover the button, and parallaxes as you scroll.</p>
          <div class="cta">
             <button class="btn btn-primary" id="shot">Save a screenshot</button>
-            <a class="btn btn-quiet" href="https://github.com/Tezumie/ShaderMate">View source</a>
+            <a class="btn" href="https://github.com/Tezumie/ShaderMate/tree/main/site/examples/hero">View source</a>
          </div>
       </div>
    </section>
 
-   <main class="wrap">
-      <h2>How this works</h2>
-      <p>The canvas is an ordinary element styled with CSS (<code>width: 100%; height: 86vh</code>); ShaderMate sizes its bitmap to match and keeps it in sync on resize. The headline and buttons are normal DOM on top of it. The pointer still reaches the shader because ShaderMate listens on the window and maps coordinates into the canvas.</p>
-      <p>Hovering the primary button tweens <code>u_hover</code>, which raises the waves' amplitude and glow. <code>u_scroll</code> shifts the field as you scroll. Rendering pauses when the hero leaves the viewport or the tab is hidden, so the page stays cheap.</p>
-      <p style="height: 50vh"></p>
+   <main class="notes">
+      <div class="head"><span class="kicker">How this works</span><h2>Real page,<br><span class="grad">shader behind it.</span></h2></div>
+      <div class="note"><h3>Sized by CSS</h3><p>The canvas is an ordinary element (<code>width: 100%; height: 92vh</code>). ShaderMate sizes its bitmap to match and keeps it in sync on resize.</p></div>
+      <div class="note"><h3>DOM on top</h3><p>The headline and buttons are normal HTML. The pointer still reaches the shader because ShaderMate listens on the window and maps coordinates into the canvas.</p></div>
+      <div class="note"><h3>Cheap when idle</h3><p>Hovering the button tweens <code>u_hover</code>; <code>u_scroll</code> adds parallax. Rendering pauses when the hero leaves the viewport or the tab is hidden.</p></div>
    </main>
    <!--FOOTER-->
    <!--SCRIPTS-->

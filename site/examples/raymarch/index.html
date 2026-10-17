@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+   <title>Raymarched blob · ShaderMate examples</title>
+   <meta name="description" content="Real 3D in one fragment shader: a wobbling SDF blob with a ring, fresnel, reflections and glow. Drag to spin.">
+   <!--HEAD-->
+   <style>html, body { height: 100%; overflow: hidden; background: #05050a }</style>
+</head>
+<body>
+   <!--BACK-->
+   <div class="hint"><b>move</b> to spin · <b>hold</b> to wobble · <kbd>S</kbd> screenshot</div>
+
+   <script src="../../lib/shadermate.js"></script>
+   <script>
+      // Raymarching: for every pixel, step a ray through a signed distance field until it hits the surface.
+      // No meshes, no engine: the whole scene is the `map` function below.
+      const sm = ShaderMate.createShader({
+         pointer: { smooth: 0.1 },
+         shader: `
+            mat2 rot(float a) { float c = cos(a), s = sin(a); return mat2(c, -s, s, c); }
+            vec3 neon(float t) { return 0.5 + 0.5 * cos(6.28318 * (t + vec3(0.0, 0.33, 0.67))); }
+
+            vec2 spin;
+            float wobble;
+
+            float map(vec3 p) {
+               p.xz *= rot(iTime * 0.35 + spin.x);
+               p.yz *= rot(iTime * 0.25 + spin.y);
+               float blob = length(p) - 1.0 + wobble * sin(p.x * 4.0 + iTime * 1.6) * sin(p.y * 4.0 + iTime * 1.2) * sin(p.z * 4.0 + iTime);
+               float ring = length(vec2(length(p.xz) - 1.6, p.y)) - 0.05;
+               return min(blob * 0.6, ring);
+            }
+
+            vec3 normalAt(vec3 p) {
+               vec2 e = vec2(0.001, 0.0);
+               return normalize(vec3(map(p + e.xyy) - map(p - e.xyy), map(p + e.yxy) - map(p - e.yxy), map(p + e.yyx) - map(p - e.yyx)));
+            }
+
+            void mainImage(out vec4 o, in vec2 fc) {
+               vec2 uv = (fc - 0.5 * iResolution.xy) / iResolution.y;
+               spin = iMouse.x > 0.0 ? (iMouse.xy / iResolution.xy - 0.5) * 3.0 : vec2(0.0);
+               wobble = iMouse.z > 0.0 ? 0.35 : 0.15;                  // iMouse.z > 0 while the button is held
+               vec3 ro = vec3(0.0, 0.0, 4.2), rd = normalize(vec3(uv, -1.6));
+
+               float d = 0.0, glow = 0.0;
+               bool hit = false;
+               for (int i = 0; i < 100; i++) {
+                  float h = map(ro + rd * d);
+                  glow += exp(-h * 12.0) * 0.02;
+                  if (h < 0.001) { hit = true; break; }
+                  d += h;
+                  if (d > 10.0) break;
+               }
+
+               vec3 col = mix(vec3(0.02, 0.01, 0.05), vec3(0.12, 0.05, 0.25), 1.0 - smoothstep(0.0, 1.2, length(uv)));
+               col += glow * vec3(0.5, 0.35, 1.0) * 0.5;
+               if (hit) {
+                  vec3 p = ro + rd * d, n = normalAt(p), l = normalize(vec3(0.6, 0.8, 0.5)), ref = reflect(rd, n);
+                  float fres = pow(1.0 - max(dot(n, -rd), 0.0), 3.0);
+                  vec3 env = mix(vec3(0.05, 0.02, 0.15), vec3(0.7, 0.5, 1.0), smoothstep(-0.3, 1.0, ref.y));
+                  vec3 base = neon(dot(n, vec3(0.4, 0.7, 0.2)) * 0.6 + iTime * 0.08);
+                  col = base * (0.15 + 0.6 * max(dot(n, l), 0.0)) + env * fres * 1.2 + pow(max(dot(ref, l), 0.0), 40.0);
+               }
+               o = vec4(pow(col, vec3(0.85)), 1.0);
+            }`,
+      });
+      addEventListener('keydown', e => { if (e.key === 's') sm.download('raymarch.png'); });
+   </script>
+</body>
+</html>

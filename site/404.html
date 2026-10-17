@@ -5,21 +5,46 @@
 <meta name="description" content="This page doesn't exist.">
 <!--HEAD noindex-->
 <style>
-.nf{min-height:70vh;display:grid;place-content:center;text-align:center;padding:96px 16px;gap:16px}
-.nf h1{font-family:var(--font-display,inherit);font-weight:800;font-size:clamp(5rem,22vw,12rem);line-height:.9;letter-spacing:-.04em;margin:0;background:linear-gradient(100deg,#7c5cff,#4dbfff 40%,#2ee6d6 60%,#ffd166);-webkit-background-clip:text;background-clip:text;color:transparent}
-.nf p{color:var(--muted,#9aa0b4);margin:0}
-.nf .row{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-top:12px}
+#bg { position: fixed; inset: 0; width: 100vw; height: 100vh; z-index: -1; }
+.nf { min-height: calc(100vh - var(--nav-h)); display: grid; place-content: center; justify-items: center; gap: 18px; padding: 96px 16px; text-align: center; }
+.nf h1 { margin: 6px 0 0; color: var(--strong); font: 700 clamp(7rem, 26vw, 16rem)/.82 var(--font-display); letter-spacing: -.07em; text-shadow: 0 10px 60px rgba(5, 5, 10, .6); }
+.nf p { max-width: 42ch; margin: 0; color: var(--text); font-size: 18px; text-shadow: 0 2px 24px rgba(5, 5, 10, .9); }
+.nf .row { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin-top: 10px; }
 </style>
 </head>
 <body>
 <a class="skip" href="#content">Skip to content</a>
+<canvas id="bg" aria-hidden="true"></canvas>
 <!--NAV-->
 <main id="content" class="nf">
-<h1>404</h1>
+<span class="kicker">Lost in the shader</span>
+<h1><span class="grad">404</span></h1>
 <p>That page isn't here. It may have moved, or the link may be wrong.</p>
-<div class="row"><a class="btn btn-primary" href="./">Go home</a><a class="btn" href="docs/">Read the docs</a><a class="btn" href="examples/">Browse examples</a></div>
+<div class="row"><a class="btn btn-primary btn-lg" href="./">Go home</a><a class="btn btn-lg" href="docs/">Read the docs</a><a class="btn btn-lg" href="examples/">Browse examples</a></div>
 </main>
 <!--FOOTER-->
 <!--SCRIPTS-->
+<script src="lib/shadermate.js"></script>
+<script>
+  // A slowly drifting signal-lost field. Move the mouse to tune it in.
+  ShaderMate.createShader({
+    canvas: '#bg', maxPixelRatio: 1, errorOverlay: false, pointer: { smooth: 0.08 },
+    shader: `
+      float hash(vec2 p) { p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
+      void mainImage(out vec4 o, in vec2 fc) {
+        vec2 uv = fc / iResolution.xy;
+        float tune = iMouse.x > 0.0 ? iMouse.x / iResolution.x : 0.5 + 0.3 * sin(iTime * 0.2);
+        float band = floor(uv.y * 60.0 + iTime * 3.0);
+        float shift = (hash(vec2(band, floor(iTime * 8.0))) - 0.5) * 0.04 * (1.0 - tune);
+        vec2 p = (fc - 0.5 * iResolution.xy) / iResolution.y + vec2(shift, 0.0);
+        float rings = sin(length(p) * 18.0 - iTime * 1.5 + tune * 6.0);
+        vec3 col = 0.5 + 0.5 * cos(6.28318 * (length(p) * 0.4 - iTime * 0.05 + vec3(0.0, 0.33, 0.67)));
+        col *= 0.18 + 0.12 * rings;
+        col += (hash(fc + fract(iTime * 7.0)) - 0.5) * 0.12 * (1.0 - tune * 0.7);
+        col *= 1.0 - 0.6 * dot(uv - 0.5, uv - 0.5) * 2.0;
+        o = vec4(col, 1.0);
+      }`,
+  });
+</script>
 </body>
 </html>

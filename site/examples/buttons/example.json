@@ -1,8 +1,8 @@
 {
   "title": "Shader buttons",
   "tag": "Interface",
-  "description": "Six real buttons with shader backgrounds: hover tweens, press states and click ripples.",
-  "code": "many instances \u00b7 tween \u00b7 pointer.target",
+  "description": "Sixteen real buttons with shader backgrounds: liquid glow, ripple, glitch, fire, chrome, galaxy, matrix and more. Hover tweens, press states, click ripples.",
+  "code": "16 instances · tween · pointer.target",
   "order": 2,
   "featured": true
 }

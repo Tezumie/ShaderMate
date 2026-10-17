@@ -27,9 +27,9 @@
          ctx.clearRect(0, 0, text.width, text.height);
          ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
          ctx.fillStyle = '#fff';
-         ctx.font = '600 230px Geist, system-ui, -apple-system, "Segoe UI", sans-serif';
+         ctx.font = '700 230px "Space Grotesk", system-ui, -apple-system, "Segoe UI", sans-serif';
          ctx.fillText(`${hh}:${mm}`, 512, 230);
-         ctx.font = '500 70px "Geist Mono", ui-monospace, Menlo, Consolas, monospace';
+         ctx.font = '500 70px "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace';
          ctx.fillStyle = '#9ff';
          ctx.fillText(`:${ss}.${String(now.getMilliseconds()).padStart(3, '0').slice(0, 2)}`, 512, 420);
       }

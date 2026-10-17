@@ -46,7 +46,7 @@ The dev server renders docs and the example gallery on the fly and serves `/lib/
 3. Add `thumb.glsl`, a tiny shader used for the live card thumbnail.
 4. Put `<!--BACK-->` just inside `<body>`. The build replaces it with the floating "Examples / Docs / View source" bar.
 
-The gallery and the home page's featured row are generated from those files; there is no list to edit. Set `"featured": true` to show it on the home page. In the build, `<!--HEAD-->` style markers in a page are replaced with shared head tags; look at an existing example before adding a new kind of page.
+The gallery is generated from those files; there is no list to edit. The home page is hand-written: its sections are in `site/index.html` and each section's scene (a ShaderMate instance on the shared stage canvas) is in `site/assets/landing.js`. In the build, `<!--HEAD-->` style markers in a page are replaced with shared head tags; look at an existing example before adding a new kind of page.
 
 ## Add a docs page
 

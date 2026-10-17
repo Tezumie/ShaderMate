@@ -7,7 +7,7 @@ import { normalizePasses, normalizeChannel, isInlineSource } from './passes.js';
 import { createContext, getExtensions, isWebGL2 } from '../gl/context.js';
 import { createQuad } from '../gl/quad.js';
 import { createBlit } from '../gl/blit.js';
-import { createProgram, getUniformInfo } from '../gl/shader.js';
+import { createProgramAsync, getUniformInfo } from '../gl/shader.js';
 import { createTarget, deleteTarget, resolvePassSize } from '../gl/targets.js';
 import { VERT_GL1, VERT_GL2 } from '../glsl/templates.js';
 import { resolveIncludes, assembleFragment, DEFAULT_INJECT, NO_INJECT } from '../glsl/preprocess.js';
@@ -24,6 +24,13 @@ import { createVisibility } from '../view/visibility.js';
 import { createStats } from '../ui/stats.js';
 import { createErrorOverlay } from '../ui/errorOverlay.js';
 import { createCapture } from '../capture/capture.js';
+
+/**
+ * Several instances may share one canvas (scene switching: pause one, play another). Remember which instance
+ * drew the canvas's current frame, so a paused instance only redraws (on resize, set(), seek()) a canvas it owns
+ * instead of painting over whichever instance is playing there.
+ */
+const lastDrawer = new WeakMap();   // canvas -> api
 
 /** Accepts create(options) or create(shaderOrPasses, options). */
 function normalizeArgs(a, b) {
@@ -211,7 +218,7 @@ export function createShader(a, b) {
             passCount: aux.length,
          },
       });
-      const r = createProgram(gl, isGL2 ? VERT_GL2 : VERT_GL1, frag, { label: pass.name, showExpandedOnError: showExpanded });
+      const r = await createProgramAsync(gl, isGL2 ? VERT_GL2 : VERT_GL1, frag, { label: pass.name, showExpandedOnError: showExpanded });
       if (r.error) throw r.error;
       return { program: r.program, source: text, compiled: frag, fragcoord: fc };
    }
@@ -229,14 +236,26 @@ export function createShader(a, b) {
       }
    }
 
+   // Size this instance last laid out for. Compared with the canvas itself rather than trusting sizer.update(),
+   // because when instances share a canvas only the first one to run sees the change happen.
+   let knownW = 0, knownH = 0;
+   function syncSize() {
+      if (canvas.width === knownW && canvas.height === knownH) return false;
+      knownW = canvas.width; knownH = canvas.height;
+      gl.viewport(0, 0, canvas.width, canvas.height);
+      resizeTargets();
+      emit('resize', { width: canvas.width, height: canvas.height });
+      return true;
+   }
+   const ownsCanvas = () => !lastDrawer.has(canvas) || lastDrawer.get(canvas) === api;
+
    function handleResize() {
       if (disposed) return;
-      if (sizer.update()) {
-         gl.viewport(0, 0, canvas.width, canvas.height);
-         resizeTargets();
-         emit('resize', { width: canvas.width, height: canvas.height });
-         if (!playing && loaded) renderNow();   // keep a paused canvas crisp
-      }
+      sizer.update();
+      // Resizing clears the canvas. This runs after the frame's draw, so redraw now (without advancing time),
+      // playing or paused; otherwise the cleared canvas is what gets shown, which turns into a black canvas
+      // when a layout makes the size wobble every frame.
+      if (syncSize() && loaded && visible && ownsCanvas()) renderNow();
    }
 
    async function loadPassChannels(po) {
@@ -281,10 +300,17 @@ export function createShader(a, b) {
    async function build() {
       PASSES = normalizePasses(expandPassBlob(options.passes));
       for (const p of PASSES) if (p.iterations > 1 && !p.screen) p.pingpong = true;   // recursion reads the previous iteration
+      // Start every pass compiling at once (the driver can work on them in parallel), then wire them up in order.
+      const builds = await Promise.allSettled(PASSES.map(pass => buildProgram(pass, pass.src)));
+      const failed = builds.find(b => b.status === 'rejected');
+      if (failed || disposed) {
+         for (const b of builds) if (b.status === 'fulfilled') gl.deleteProgram(b.value.program);
+         if (failed) throw failed.reason;
+         return;
+      }
       for (let i = 0; i < PASSES.length; i++) {
          const pass = PASSES[i];
-         const { program, source, compiled, fragcoord } = await buildProgram(pass, pass.src);
-         if (disposed) { gl.deleteProgram(program); return; }
+         const { program, source, compiled, fragcoord } = builds[i].value;
          const po = {
             cfg: pass, name: pass.name, index: i,
             programId: pool.add(program, 'program'),
@@ -380,7 +406,12 @@ export function createShader(a, b) {
       }
       if (u.u_mouse) {
          // vec2 = position; vec4 = position + click position, zw negative while the button is up (FragCoord.xyz convention)
-         if (u.u_mouse.type === GL_FLOAT_VEC4) { const s = m.down ? 1 : -1; gl.uniform4f(u.u_mouse.loc, m.x * k, m.y * ky, m.clickX * k * s, m.clickY * ky * s); }
+         if (u.u_mouse.type === GL_FLOAT_VEC4) {
+            // FragCoord.xyz convention: zw = click position, negative while the button is up. Before the first
+            // click that position is 0, and -0 isn't negative to step()/sign(), so use a tiny negative instead.
+            const up = v => -Math.max(v, 1e-3);
+            gl.uniform4f(u.u_mouse.loc, m.x * k, m.y * ky, m.down ? m.clickX * k : up(m.clickX * k), m.down ? m.clickY * ky : up(m.clickY * ky));
+         }
          else gl.uniform2f(u.u_mouse.loc, m.x * k, m.y * ky);
       }
       if (u.u_mouseUV) gl.uniform2f(u.u_mouseUV.loc, m.uvX, m.uvY);
@@ -445,6 +476,7 @@ export function createShader(a, b) {
    /** Advance the clock (if playing/forced) and draw every pass. */
    function frameStep(now, { advance = playing, rawDt } = {}) {
       const t0 = performance.now();
+      syncSize();
       if (rawDt === undefined) rawDt = Math.max(0, (now - last) * 0.001);
       last = now;
       if (rawDt > 0.002 && rawDt < 0.1) { rafDts.push(rawDt); if (rafDts.length > 30) rafDts.shift(); if (rafDts.length >= 10) { const s = [...rafDts].sort((a, b) => a - b); refreshRate = Math.round(1 / s[s.length >> 1]); } }
@@ -482,6 +514,7 @@ export function createShader(a, b) {
          if (po.cfg.screen && mainBackbuffer && blit) blit.draw(pool.get(po.target.texId), canvas.width, canvas.height);
       }
       gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+      lastDrawer.set(canvas, api);
 
       emit('afterFrame', info);
       if (stats) stats.update({ rawDt, cpuMs: performance.now() - t0, frame, time, width: canvas.width, height: canvas.height, passes: passObjs.length });
@@ -491,6 +524,7 @@ export function createShader(a, b) {
       rafId = requestAnimationFrame(loop);
       if (!loaded || !visible) { last = now; return; }
       if (!playing && tweens.size === 0 && options.renderWhilePaused !== true) { last = now; return; }
+      if (!playing && !ownsCanvas()) { last = now; return; }   // a paused instance never paints over another one sharing the canvas
       if (maxFps > 0 && now - lastRender < 1000 / maxFps - 0.5) return;
       lastRender = now;
       frameStep(now);
@@ -604,7 +638,7 @@ export function createShader(a, b) {
    function scheduleRender() {
       if (renderQueued) return;
       renderQueued = true;
-      requestAnimationFrame(() => { renderQueued = false; if (!playing) renderNow(); });
+      requestAnimationFrame(() => { renderQueued = false; if (!playing && ownsCanvas()) renderNow(); });
    }
 
    async function setShader(src, passName) {
@@ -725,6 +759,7 @@ export function createShader(a, b) {
 
    // ---- go --------------------------------------------------------------
    sizer.update();
+   knownW = canvas.width; knownH = canvas.height;
    gl.viewport(0, 0, canvas.width, canvas.height);
    removeResize = sizer.observe(handleResize);
 
@@ -736,7 +771,7 @@ export function createShader(a, b) {
       emit('load', api);
       if (options.onReady) options.onReady(api);
       startLoop();
-      if (!playing) renderNow();
+      if (!playing && ownsCanvas()) renderNow();
       return api;
    })();
    readyPromise.catch(err => { if (!disposed) reportError(err); });

@@ -13,7 +13,9 @@ export function createVisibility(canvas, { enabled = true, margin = '100px', onC
       document.addEventListener('visibilitychange', onVis);
       if (typeof IntersectionObserver !== 'undefined') {
          io = new IntersectionObserver(entries => {
-            for (const e of entries) inView = e.isIntersecting;
+            // A canvas that isn't in the document (an offscreen render source for another library, a texture
+            // generator…) always reports "not intersecting"; it can't scroll out of view, so keep it rendering.
+            for (const e of entries) inView = e.isIntersecting || !e.target.isConnected;
             notify();
          }, { rootMargin: margin });
          io.observe(canvas);

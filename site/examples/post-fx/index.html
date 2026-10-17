@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+   <title>Dither post-processing · ShaderMate examples</title>
+   <meta name="description" content="Render a synthwave scene in one pass, pipe it into a 4×4 Bayer dither in the next. An x-ray lens on the cursor shows the raw scene.">
+   <!--HEAD-->
+   <style>
+      html, body { height: 100%; overflow: hidden; background: #05050a }
+      #gui { position: fixed; right: 16px; top: 66px; z-index: 10; }
+   </style>
+</head>
+<body>
+   <!--BACK-->
+   <div id="gui"></div>
+   <div class="hint"><b>move</b> the x-ray lens · <b>hold</b> to widen · <kbd>S</kbd> screenshot</div>
+
+   <script src="../../assets/theme.js"></script>
+   <script src="../../lib/shadermate.js"></script>
+   <script src="../../lib/shadermate-gui.js"></script>
+   <script>
+      // Pass 1 renders the scene into a texture. Pass 2 reads it (channel 0), pixelates and dithers it,
+      // except inside a lens around the cursor where the original shows through.
+      const scene = `
+         float hash(vec2 p) { p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
+         float noise(vec2 p) {
+            vec2 i = floor(p), f = fract(p), u = f * f * (3.0 - 2.0 * f);
+            return mix(mix(hash(i), hash(i + vec2(1, 0)), u.x), mix(hash(i + vec2(0, 1)), hash(i + vec2(1)), u.x), u.y);
+         }
+         float fbm(vec2 p) { float v = 0.0, a = 0.5; for (int i = 0; i < 5; i++) { v += a * noise(p); p = p * 2.02 + vec2(1.7, 9.2); a *= 0.5; } return v; }
+
+         void mainImage(out vec4 o, in vec2 fc) {
+            vec2 uv = (fc - 0.5 * iResolution.xy) / iResolution.y;
+            float horizon = -0.08;
+            vec3 col = mix(vec3(0.9, 0.2, 0.55), vec3(0.04, 0.01, 0.12), smoothstep(horizon, 0.55, uv.y));
+
+            vec2 s = uv - vec2(0.0, 0.14);
+            float sun = 1.0 - smoothstep(0.27, 0.275, length(s));
+            float cuts = step(0.0, sin(s.y * 110.0 + iTime * 2.0) + 0.7 + s.y * 4.0);
+            col = mix(col, mix(vec3(1.0, 0.2, 0.55), vec3(1.0, 0.85, 0.25), smoothstep(-0.25, 0.25, s.y)), sun * cuts);
+            col += vec3(1.0, 0.3, 0.6) * exp(-length(s) * 3.5) * 0.35;
+
+            float ridge = horizon + (0.04 + 0.25 * fbm(vec2(uv.x * 2.5, 1.0))) * smoothstep(0.15, 1.0, abs(uv.x));
+            float mountain = (1.0 - smoothstep(ridge - 0.003, ridge + 0.003, uv.y)) * step(horizon, uv.y);
+            col = mix(col, vec3(0.08, 0.02, 0.16) + vec3(0.6, 0.2, 0.8) * smoothstep(ridge - 0.06, ridge, uv.y) * 0.4, mountain);
+
+            float depth = horizon - uv.y, z = 0.35 / max(depth, 0.001);
+            vec2 g = vec2(uv.x * z, z + iTime * 2.0);
+            vec2 lines = 1.0 - smoothstep(vec2(0.0), fwidth(g) * 1.5, abs(fract(g - 0.5) - 0.5));
+            float fade = exp(-z * 0.08);
+            vec3 ground = vec3(0.03, 0.0, 0.08) + mix(vec3(1.0, 0.2, 0.7), vec3(0.2, 0.9, 1.0), fade) * max(lines.x, lines.y) * fade * 1.5;
+            ground += vec3(0.9, 0.2, 0.6) * exp(-depth * 25.0) * 0.4;
+            o = vec4(mix(col, ground, step(0.0, depth)), 1.0);
+         }`;
+
+      const dither = `
+         uniform float u_pixel;    // pixel size in screen pixels
+         uniform float u_levels;   // colour levels per channel
+         uniform float u_lens;     // lens radius
+         float bayer2(vec2 a) { a = floor(a); return fract(a.x / 2.0 + a.y * a.y * 0.75); }
+         float bayer4(vec2 a) { return bayer2(0.5 * a) * 0.25 + bayer2(a); }
+
+         void mainImage(out vec4 o, in vec2 fc) {
+            vec2 cell = floor(fc / u_pixel);
+            vec3 raw = texture(iChannel0, fc / iResolution.xy).rgb;
+            vec3 pixel = texture(iChannel0, (cell + 0.5) * u_pixel / iResolution.xy).rgb;
+            vec3 dithered = floor(pixel * (u_levels - 1.0) + bayer4(cell)) / (u_levels - 1.0);
+
+            vec2 p = (fc - 0.5 * iResolution.xy) / iResolution.y;
+            vec2 lens = iMouse.x > 0.0 ? (iMouse.xy - 0.5 * iResolution.xy) / iResolution.y : vec2(sin(iTime * 0.6) * 0.5, -0.05 + cos(iTime * 0.4) * 0.15);
+            float radius = u_lens + (iMouse.z > 0.0 ? 0.12 : 0.0);
+            float r = length(p - lens);
+            vec3 col = mix(dithered, raw, 1.0 - smoothstep(radius, radius + 0.005, r));
+            col += vec3(0.7, 0.9, 1.0) * (1.0 - smoothstep(0.0, 0.004, abs(r - radius - 0.005)));
+            o = vec4(col, 1.0);
+         }`;
+
+      const sm = ShaderMate.createShader({
+         passes: [
+            { name: 'scene', shader: scene },
+            {
+               name: 'dither', shader: dither, channels: ['scene'],
+               uniforms: {
+                  u_pixel: { value: 4, min: 1, max: 12, step: 1, label: 'pixel size' },
+                  u_levels: { value: 3, min: 2, max: 8, step: 1, label: 'levels' },
+                  u_lens: { value: 0.22, min: 0, max: 0.6, label: 'lens radius' },
+               },
+            },
+         ],
+      });
+      ShaderMate.createGui(sm, { title: 'dither.glsl', container: document.getElementById('gui'), controls: false, theme: window.SITE_THEME });
+      addEventListener('keydown', e => { if (e.key === 's' && e.target === document.body) sm.download('dither.png'); });
+   </script>
+</body>
+</html>

@@ -1,0 +1,8 @@
+{
+  "title": "Dither post-processing",
+  "tag": "Multipass",
+  "description": "Render a synthwave scene in one pass, pipe it into a 4×4 Bayer dither in the next. An x-ray lens on the cursor shows the raw scene.",
+  "code": "scene → dither · channels · GUI",
+  "order": 10,
+  "featured": true
+}

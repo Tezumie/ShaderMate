@@ -1,0 +1,8 @@
+{
+  "title": "Reaction diffusion",
+  "tag": "Simulation",
+  "description": "Gray-Scott chemistry on the GPU: four chained float passes give 240 simulation steps a second. Drag to seed new growth.",
+  "code": "4 chained passes · float · wrap: repeat",
+  "order": 8,
+  "featured": true
+}

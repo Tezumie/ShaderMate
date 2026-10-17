@@ -1,0 +1,8 @@
+{
+  "title": "Liquid metaballs",
+  "tag": "Interaction",
+  "description": "Glossy blobs that merge and split. One of them follows your cursor and grows while you hold the button.",
+  "code": "iMouse · analytic normals",
+  "order": 12,
+  "featured": true
+}

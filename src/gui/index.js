@@ -53,19 +53,33 @@ function addUniform(folder, sm, name, entry, passName) {
       // keep slider in sync with tweens / sm.set()
       Object.defineProperty(proxy, name, { get: () => sm.get(name, passName), set: push });
    } else if (d.kind === 'color') {
-      proxy[name] = Array.from(spec.value).slice(0, 3);
+      // lil-gui edits this array in place, so it stays the same object; follow() refreshes it from sm.get().
+      const buf = proxy[name] = Array.from(spec.value).slice(0, 3);
       const alpha = spec.value.length === 4 ? spec.value[3] : null;
-      folder.addColor(proxy, name).name(label).onChange(c => push(alpha === null ? Array.from(c) : [...c, alpha]));
+      const ctrl = folder.addColor(proxy, name).name(label).onChange(c => push(alpha === null ? Array.from(c) : [...c, alpha]));
+      follow(sm, () => sm.get(name, passName), buf, () => ctrl.updateDisplay());
    } else {
       const sub = folder.addFolder(label);
       const comps = ['x', 'y', 'z', 'w'].slice(0, d.n);
       const cur = Array.from(spec.value);
-      comps.forEach((c, i) => {
+      const ctrls = comps.map((c, i) => {
          proxy[c] = cur[i];
          const r = range(cur[i], spec, false);
-         sub.add(proxy, c, r.min, r.max, r.step).onChange(v => { cur[i] = v; push(cur.slice()); });
+         return sub.add(proxy, c, r.min, r.max, r.step).onChange(v => { cur[i] = v; push(cur.slice()); });
       });
+      follow(sm, () => sm.get(name, passName), cur, () => comps.forEach((c, i) => { proxy[c] = cur[i]; ctrls[i].updateDisplay(); }));
    }
+}
+
+/** Keep a colour / vector control in sync when the uniform changes elsewhere (sm.set, sm.tween, your own code). */
+function follow(sm, read, local, refresh) {
+   sm.on('afterFrame', () => {
+      const v = read();
+      if (v == null || typeof v !== 'object') return;
+      let changed = false;
+      for (let i = 0; i < local.length; i++) if (v[i] !== undefined && Math.abs(v[i] - local[i]) > 1e-6) { local[i] = v[i]; changed = true; }
+      if (changed) refresh();
+   });
 }
 
 /**

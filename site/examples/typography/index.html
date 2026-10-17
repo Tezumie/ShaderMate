@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+   <title>Shader typography · ShaderMate examples</title>
+   <meta name="description" content="A headline filled with a live shader. The text stays real DOM (click it and type); a CSS blend mode lets the shader show through the letters.">
+   <!--HEAD-->
+   <style>
+      html, body { height: 100%; overflow: hidden; background: #05050a }
+      #paint { position: fixed; inset: 0; width: 100%; height: 100%; }
+      /* A black layer with white text, multiplied over the shader: black hides it, white lets it through. */
+      .mask {
+         position: fixed; inset: 0; display: grid; place-items: center; padding: 0 4vw;
+         background: #05050a; mix-blend-mode: multiply;
+      }
+      .mask h1 {
+         margin: 0; outline: none; color: #fff; text-align: center; cursor: text;
+         font: 700 min(19vw, 30vh)/.84 var(--font-display); letter-spacing: -.07em;
+      }
+   </style>
+</head>
+<body>
+   <canvas id="paint"></canvas>
+   <div class="mask"><h1 contenteditable="true" spellcheck="false">SHADE<br>ANYTHING</h1></div>
+   <!--BACK-->
+   <div class="hint"><b>click the text</b> and type · <b>move</b> to stir the ink</div>
+
+   <script src="../../lib/shadermate.js"></script>
+   <script>
+      ShaderMate.createShader({
+         canvas: '#paint',
+         pointer: { smooth: 0.08 },
+         shader: `
+            float hash(vec2 p) { p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
+            float noise(vec2 p) {
+               vec2 i = floor(p), f = fract(p), u = f * f * (3.0 - 2.0 * f);
+               return mix(mix(hash(i), hash(i + vec2(1, 0)), u.x), mix(hash(i + vec2(0, 1)), hash(i + vec2(1)), u.x), u.y);
+            }
+            float fbm(vec2 p) { float v = 0.0, a = 0.5; for (int i = 0; i < 5; i++) { v += a * noise(p); p = p * 2.02 + vec2(1.7, 9.2); a *= 0.5; } return v; }
+            vec3 neon(float t) { return 0.5 + 0.5 * cos(6.28318 * (t + vec3(0.0, 0.33, 0.67))); }
+
+            void mainImage(out vec4 o, in vec2 fc) {
+               vec2 uv = (fc - 0.5 * iResolution.xy) / iResolution.y;
+               vec2 m = iMouse.x > 0.0 ? (iMouse.xy - 0.5 * iResolution.xy) / iResolution.y : vec2(sin(iTime * 0.4) * 0.6, cos(iTime * 0.3) * 0.3);
+               vec2 d = uv - m;
+               uv += d * 0.6 * exp(-dot(d, d) * 5.0) * sin(iTime * 2.0 - length(d) * 8.0);   // stir around the cursor
+
+               float t = iTime * 0.2;
+               vec2 w = uv + 0.6 * vec2(fbm(uv * 2.0 + t), fbm(uv * 2.0 - t + 5.0));
+               float bands = sin((w.x + w.y) * 9.0 + fbm(w * 3.0) * 6.0 - iTime);
+               vec3 col = neon(0.5 + 0.25 * bands + 0.3 * w.x + t * 0.3);
+               col *= 0.7 + 0.5 * smoothstep(0.6, 1.0, bands);
+               col += pow(max(bands, 0.0), 20.0) * 0.8;
+               o = vec4(col, 1.0);
+            }`,
+      });
+   </script>
+</body>
+</html>

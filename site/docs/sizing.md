@@ -52,3 +52,14 @@ sm.on('resize', ({ width, height }) => { … });
 ```
 
 Passes with a `size` of `'half'`, `'quarter'`, a number or `[w, h]` resize along with the canvas; fixed-size ones don't.
+
+## Canvases inside grids and flex layouts
+
+A canvas's bitmap size is also its natural size, so a grid or flex track sized by its content can grow with the bitmap, which makes the bitmap grow again. Give the canvas a box whose size comes from the layout alone:
+
+```css
+.view { position: relative; min-width: 0; min-height: 0; }        /* the grid / flex item */
+.view canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+```
+
+In a grid, use `minmax(0, 1fr)` tracks instead of plain `1fr`, so content can't stretch them.

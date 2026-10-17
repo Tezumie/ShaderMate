@@ -1,6 +1,6 @@
 {
   "name": "shadermate",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "Drop a GLSL shader on any canvas. Multi-pass, ShaderToy-compatible, zero dependencies.",
   "type": "module",
   "license": "MIT",

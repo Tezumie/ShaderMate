@@ -1,0 +1,8 @@
+{
+  "title": "Shader typography",
+  "tag": "Website",
+  "description": "A headline filled with a live shader. The text stays real DOM (click it and type); a CSS blend mode lets the shader show through the letters.",
+  "code": "mix-blend-mode · contenteditable",
+  "order": 11,
+  "featured": true
+}

@@ -1,0 +1,8 @@
+{
+  "title": "Mesh gradient + GUI",
+  "tag": "Website",
+  "description": "An animated mesh-gradient generator for hero backgrounds. createGui builds the panel from the uniforms; presets and randomize sit on top.",
+  "code": "createGui · color: true · presets",
+  "order": 9,
+  "featured": true
+}

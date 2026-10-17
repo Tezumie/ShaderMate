@@ -5,11 +5,19 @@
    <meta name="description" content="Edit GLSL and watch it hot-reload, with presets, an error overlay, screenshots and recording.">
    <!--HEAD-->
    <style>
-      body { height: 100vh; display: grid; grid-template-rows: 56px 1fr; grid-template-columns: minmax(320px, 46%) 1fr; overflow: hidden }
+      body { height: 100vh; display: grid; grid-template-rows: 56px minmax(0, 1fr); grid-template-columns: minmax(320px, 46%) minmax(0, 1fr); overflow: hidden }
       .toolbar { grid-column: 1 / -1 }
-      textarea { width: 100%; height: 100%; padding: 16px; border: 0; border-right: 1px solid var(--border); resize: none; background: var(--surface); color: var(--text-strong); font: 13px/1.55 var(--mono-font); outline: none; tab-size: 4 }
-      canvas { width: 100%; height: 100%; display: block; background: #000 }
-      @media (max-width: 700px) { body { grid-template-columns: 1fr; grid-template-rows: 56px 1fr 1fr } textarea { border-right: 0; border-bottom: 1px solid var(--border) } }
+      /* The editor is a transparent <textarea> over a highlighted <pre> with identical metrics. */
+      .editor { position: relative; overflow: hidden; border-right: 1px solid var(--line); background: var(--panel) }
+      .editor textarea, .editor pre { position: absolute; inset: 0; margin: 0; padding: 18px 20px; border: 0; font: 13px/1.6 var(--font-mono); tab-size: 4; white-space: pre; overflow: auto; letter-spacing: 0 }
+      .editor pre { pointer-events: none; color: #e2def6 }
+      .editor textarea { resize: none; background: transparent; color: transparent; caret-color: var(--lime); outline: none; scrollbar-width: thin; scrollbar-color: var(--line-2) transparent }
+      .editor textarea::selection { background: rgba(198, 255, 61, .22); color: transparent }
+      .editor pre::-webkit-scrollbar { display: none }
+      /* The canvas sits in a box whose size comes from the grid alone, so its bitmap size can't feed back into the layout. */
+      .view { position: relative; min-width: 0; min-height: 0; overflow: hidden; background: #000 }
+      .view canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block }
+      @media (max-width: 700px) { body { grid-template-columns: minmax(0, 1fr); grid-template-rows: 56px minmax(0, 1fr) minmax(0, 1fr) } .editor { border-right: 0; border-bottom: 1px solid var(--line) } }
    </style>
 </head>
 <body>
@@ -21,8 +29,11 @@
       <button class="btn btn-primary btn-sm" id="pause">Pause</button>
       <span class="meta" id="fps"></span>
    </header>
-   <textarea id="code" spellcheck="false"></textarea>
-   <canvas id="out"></canvas>
+   <div class="editor">
+      <pre id="hl" aria-hidden="true"></pre>
+      <textarea id="code" spellcheck="false" autocomplete="off" autocapitalize="off" aria-label="Shader source"></textarea>
+   </div>
+   <div class="view"><canvas id="out"></canvas></div>
 
    <script src="../../assets/theme.js"></script>
    <script type="module">
@@ -32,7 +43,7 @@
          'Tunnel': `void mainImage(out vec4 o, in vec2 fc) {
     vec2 p = (fc - 0.5 * iResolution.xy) / iResolution.y;
     float a = atan(p.y, p.x), r = length(p);
-    vec2 uv = vec2(0.3 / r + iTime * 0.6, a / 3.1416 + iTime * 0.1);
+    vec2 uv = vec2(0.3 / r + iTime * 0.6, a * 0.5 + iTime * 0.1);
     float f = sin(uv.x * 12.0) * sin(uv.y * 12.0);
     vec3 col = 0.5 + 0.5 * cos(iTime + uv.xyx * 4.0 + vec3(0, 2, 4));
     col *= smoothstep(-0.2, 0.6, f) * r * 2.5;
@@ -72,7 +83,7 @@ uniform float u_scroll;    // mouse-wheel accumulator: exp(u_scroll) = zoom
 
 void main() {
     vec2 p = (gl_FragCoord.xy - 0.5 * u_resolution) / u_resolution.y * exp(-u_scroll);
-    vec2 m = (u_mouse.xy - 0.5 * u_resolution) / u_resolution.y;
+    vec2 m = u_mouse.x > 0.0 ? (u_mouse.xy - 0.5 * u_resolution) / u_resolution.y : vec2(0.0);
     float t = u_time;
     float d = length(p - m * 0.5);
     float rings = sin(d * 30.0 - t * 4.0) * 0.5 + 0.5;
@@ -97,9 +108,33 @@ void mainImage(out vec4 o, in vec2 fc) {
       };
 
       const code = document.getElementById('code');
+      const hl = document.getElementById('hl');
       const sel = document.getElementById('preset');
       for (const name in presets) sel.append(new Option(name, name));
       code.value = presets[sel.value];
+
+      // Tiny GLSL highlighter: one regex pass, colours from the site's code theme.
+      const TYPES = 'void|bool|int|uint|float|double|[biu]?vec[234]|mat[234](?:x[234])?|sampler2D|samplerCube|struct';
+      const KEYWORDS = 'uniform|in|out|inout|const|varying|attribute|precision|highp|mediump|lowp|if|else|for|while|do|return|break|continue|discard|true|false';
+      const BUILTINS = 'i(?:Resolution|Time|TimeDelta|Frame|FrameRate|Mouse|Date|Channel[0-3]|ChannelResolution|ChannelTime)|u_(?:resolution|time|delta|frame|fps|mouse|mouseUV|mouseDown|date|scroll|pixelRatio|aspect)|gl_FragCoord|fragColor';
+      const FUNCS = 'sin|cos|tan|asin|acos|atan|pow|exp|log|exp2|log2|sqrt|inversesqrt|abs|sign|floor|ceil|fract|mod|min|max|clamp|mix|step|smoothstep|length|distance|dot|cross|normalize|reflect|refract|texture|texture2D|textureCube|dFdx|dFdy|fwidth|mainImage|main';
+      const TOKEN = new RegExp(`(\\/\\/[^\\n]*|\\/\\*[\\s\\S]*?\\*\\/)|(#\\w+)|\\b(\\d+\\.?\\d*(?:e[+-]?\\d+)?|\\.\\d+)\\b|\\b(${TYPES})\\b|\\b(${KEYWORDS})\\b|\\b(${BUILTINS})\\b|\\b(${FUNCS})(?=\\s*\\()`, 'g');
+      const CLASSES = [, 'hljs-comment', 'hljs-meta', 'hljs-number', 'hljs-type', 'hljs-keyword', 'hljs-attr', 'hljs-title'];
+      const esc = t => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      function paint() {
+         const src = code.value;
+         let out = '', last = 0;
+         for (const m of src.matchAll(TOKEN)) {
+            const group = m.findIndex((g, i) => i > 0 && g !== undefined);
+            out += esc(src.slice(last, m.index)) + `<span class="${CLASSES[group]}">${esc(m[0])}</span>`;
+            last = m.index + m[0].length;
+         }
+         hl.innerHTML = out + esc(src.slice(last)) + '\n';
+         hl.scrollTop = code.scrollTop; hl.scrollLeft = code.scrollLeft;
+      }
+      code.addEventListener('input', paint);
+      code.addEventListener('scroll', () => { hl.scrollTop = code.scrollTop; hl.scrollLeft = code.scrollLeft; });
+      paint();
 
       // errorOverlay: true draws compile errors over the canvas (default 'auto' = only on localhost)
       const sm = createShader({ canvas: '#out', shader: code.value, errorOverlay: true, theme: window.SITE_THEME });
@@ -108,9 +143,9 @@ void mainImage(out vec4 o, in vec2 fc) {
       const reload = () => sm.setShader(code.value).catch(() => { /* shown in the overlay */ });
       code.addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(reload, 250); });
       code.addEventListener('keydown', e => {           // Tab inserts spaces instead of leaving the box
-         if (e.key === 'Tab') { e.preventDefault(); const s = code.selectionStart; code.setRangeText('    ', s, code.selectionEnd, 'end'); }
+         if (e.key === 'Tab') { e.preventDefault(); const s = code.selectionStart; code.setRangeText('    ', s, code.selectionEnd, 'end'); paint(); }
       });
-      sel.addEventListener('change', () => { code.value = presets[sel.value]; reload(); });
+      sel.addEventListener('change', () => { code.value = presets[sel.value]; paint(); reload(); });
 
       document.getElementById('shot').onclick = () => sm.download('livecode.png');
       document.getElementById('rec').onclick = async e => {

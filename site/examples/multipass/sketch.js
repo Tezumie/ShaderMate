@@ -37,7 +37,10 @@ const sm = ShaderMate.createShader({
    theme: window.SITE_THEME,
 });
 
-ShaderMate.createGui(sm, { title: 'Flow field' });
+// The panel goes in a box just below the page's top bar (lil-gui's default spot is the very corner).
+const panel = document.body.appendChild(document.createElement('div'));
+panel.style.cssText = 'position: fixed; top: 64px; right: 16px; z-index: 10';
+ShaderMate.createGui(sm, { title: 'Flow field', container: panel });
 
 addEventListener('keydown', e => {
    if (e.key === 'c') { sm.set('u_clear', 1); setTimeout(() => sm.set('u_clear', 0), 50); }

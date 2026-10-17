@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+   <title>Mesh gradient + GUI · ShaderMate examples</title>
+   <meta name="description" content="An animated mesh-gradient generator for hero backgrounds. createGui builds the panel from the uniforms; presets and randomize sit on top.">
+   <!--HEAD-->
+   <style>
+      html, body { height: 100%; overflow: hidden; background: #05050a }
+      #gui { position: fixed; right: 16px; top: 66px; z-index: 10; }
+      .title { position: fixed; left: clamp(20px, 5vw, 72px); bottom: clamp(70px, 12vh, 120px); z-index: 2; pointer-events: none; }
+      .title h1 { color: #fff; font: 700 clamp(44px, 8vw, 120px)/.88 var(--font-display); letter-spacing: -.055em; text-shadow: 0 10px 60px rgba(5, 5, 10, .35); }
+   </style>
+</head>
+<body>
+   <!--BACK-->
+   <div id="gui"></div>
+   <div class="title"><h1>Your next<br>hero, live.</h1></div>
+   <div class="hint"><b>tweak the panel</b> · <b>move</b> to pull the colours · <kbd>S</kbd> screenshot</div>
+
+   <script src="../../assets/theme.js"></script>
+   <script src="../../lib/shadermate.js"></script>
+   <script src="../../lib/shadermate-gui.js"></script>
+   <script>
+      // Four colour points wander around; every pixel blends them by inverse distance, then the
+      // coordinates are swirled and warped with noise. Every uniform carries GUI hints (min, max, color),
+      // so createGui() can build the panel by itself.
+      const PRESETS = {
+         Aurora: [[0.10, 0.05, 0.35], [0.49, 0.36, 1.00], [0.13, 0.83, 0.93], [1.00, 0.31, 0.85]],
+         Sunset: [[0.99, 0.36, 0.25], [1.00, 0.73, 0.30], [0.84, 0.18, 0.48], [0.30, 0.10, 0.45]],
+         Lagoon: [[0.02, 0.20, 0.35], [0.00, 0.62, 0.66], [0.55, 0.95, 0.80], [0.10, 0.35, 0.85]],
+         Acid:   [[0.78, 1.00, 0.24], [0.05, 0.05, 0.08], [0.13, 0.83, 0.93], [0.95, 0.95, 0.98]],
+      };
+
+      const sm = ShaderMate.createShader({
+         pointer: { smooth: 0.06 },
+         preserveDrawingBuffer: true,
+         uniforms: {
+            u_c1: { value: PRESETS.Aurora[0], color: true, label: 'colour 1' },
+            u_c2: { value: PRESETS.Aurora[1], color: true, label: 'colour 2' },
+            u_c3: { value: PRESETS.Aurora[2], color: true, label: 'colour 3' },
+            u_c4: { value: PRESETS.Aurora[3], color: true, label: 'colour 4' },
+            u_speed: { value: 0.35, min: 0, max: 2, label: 'speed' },
+            u_warp: { value: 0.8, min: 0, max: 2, label: 'warp' },
+            u_swirl: { value: 1.5, min: -4, max: 4, label: 'swirl' },
+            u_scale: { value: 1.2, min: 0.5, max: 3, label: 'scale' },
+            u_grain: { value: 0.06, min: 0, max: 0.2, step: 0.001, label: 'grain' },
+         },
+         shader: `
+            uniform vec3 u_c1;
+            uniform vec3 u_c2;
+            uniform vec3 u_c3;
+            uniform vec3 u_c4;
+            uniform float u_speed;
+            uniform float u_warp;
+            uniform float u_swirl;
+            uniform float u_scale;
+            uniform float u_grain;
+
+            float hash(vec2 p) { p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
+            float noise(vec2 p) {
+               vec2 i = floor(p), f = fract(p), u = f * f * (3.0 - 2.0 * f);
+               return mix(mix(hash(i), hash(i + vec2(1, 0)), u.x), mix(hash(i + vec2(0, 1)), hash(i + vec2(1)), u.x), u.y);
+            }
+            float fbm(vec2 p) { float v = 0.0, a = 0.5; for (int i = 0; i < 5; i++) { v += a * noise(p); p = p * 2.02 + vec2(1.7, 9.2); a *= 0.5; } return v; }
+            mat2 rot(float a) { float c = cos(a), s = sin(a); return mat2(c, -s, s, c); }
+            float weight(vec2 uv, vec2 p) { return 1.0 / (dot(uv - p, uv - p) + 0.02); }
+
+            void mainImage(out vec4 o, in vec2 fc) {
+               float t = iTime * u_speed;
+               vec2 uv = (fc - 0.5 * iResolution.xy) / iResolution.y * u_scale;
+               vec2 m = (iMouse.xy - 0.5 * iResolution.xy) / iResolution.y * u_scale;
+               if (iMouse.x > 0.0) uv += (m - uv) * 0.3 * exp(-length(uv - m) * 1.5);
+               uv *= rot(u_swirl * exp(-dot(uv, uv) * 0.8));
+               uv += u_warp * (vec2(fbm(uv * 1.2 + t), fbm(uv * 1.2 - t + 7.0)) - 0.5);
+
+               float w1 = weight(uv, vec2(sin(t * 1.1), cos(t * 0.9)) * 0.6);
+               float w2 = weight(uv, vec2(cos(t * 0.7 + 2.0), sin(t * 1.3 + 1.0)) * 0.6);
+               float w3 = weight(uv, vec2(sin(t * 0.8 + 4.0), cos(t * 1.2 + 3.0)) * 0.6);
+               float w4 = weight(uv, vec2(cos(t * 1.4 + 5.0), sin(t * 0.6 + 2.0)) * 0.6);
+               vec3 col = (u_c1 * w1 + u_c2 * w2 + u_c3 * w3 + u_c4 * w4) / (w1 + w2 + w3 + w4);
+               o = vec4(col + (hash(fc + fract(iTime)) - 0.5) * u_grain, 1.0);
+            }`,
+      });
+
+      // The panel: generated from the uniforms, plus a preset menu and a randomize button on top.
+      ShaderMate.createGui(sm, { title: 'mesh-gradient.glsl', container: document.getElementById('gui'), controls: false, theme: window.SITE_THEME }).then(gui => {
+         const ui = {
+            preset: 'Aurora',
+            randomize() { ['u_c1', 'u_c2', 'u_c3', 'u_c4'].forEach(n => sm.set(n, [Math.random(), Math.random(), Math.random()])); },
+            screenshot() { sm.download('mesh-gradient.png'); },
+         };
+         const setPreset = name => PRESETS[name].forEach((c, i) => sm.tween('u_c' + (i + 1), c, { duration: 900, ease: 'inOutCubic' }));
+         gui.add(ui, 'preset', Object.keys(PRESETS)).onChange(setPreset);
+         gui.add(ui, 'randomize').name('🎲 randomize');
+         gui.add(ui, 'screenshot').name('📷 screenshot');
+
+         // Until someone touches the panel, cycle through the presets on our own.
+         let touched = false;
+         gui.onChange(() => { touched = true; });
+         const names = Object.keys(PRESETS);
+         let i = 0;
+         const timer = setInterval(() => {
+            if (touched) return clearInterval(timer);
+            ui.preset = names[++i % names.length];
+            gui.controllersRecursive().forEach(c => c.updateDisplay());
+            setPreset(ui.preset);
+         }, 4000);
+      });
+
+      addEventListener('keydown', e => { if (e.key === 's' && e.target === document.body) sm.download('mesh-gradient.png'); });
+   </script>
+</body>
+</html>
